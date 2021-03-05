@@ -1,4 +1,5 @@
 
+import os
 import torch
 import numpy as np
 
@@ -173,6 +174,14 @@ class AgentRL:
         """
         for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_( (1-tau) * mtarget_param.data + tau * mactor_param.data)
+
+    def save_models_to_disk(self, storage_dir, prefix=""):
+        torch.save(self.model_actor,  os.path.join(storage_dir, prefix + self.name + "_model_actor.pickle"))
+        torch.save(self.model_target, os.path.join(storage_dir, prefix + self.name + "_model_target.pickle"))
+
+    def load_models_from_disk(self, storage_dir, prefix=""):
+        self.model_actor = torch.load(os.path.join(storage_dir, prefix + self.name + "_model_actor.pickle"))
+        self.model_target= torch.load(os.path.join(storage_dir, prefix + self.name + "_model_target.pickle"))
 
 
 

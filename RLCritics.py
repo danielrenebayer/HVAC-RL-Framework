@@ -12,7 +12,7 @@ class CriticMergeAndOnlyFC:
     The state and the action vector are merged.
     """
     
-    def __init__(self, input_variables, agents, hidden_size):
+    def __init__(self, input_variables, agents, hidden_size, lr=0.001):
         self.input_variables = input_variables
         self.agent_variables = [ f"{agent.name} {controlled_var}" for agent in agents for controlled_var in agent.controlled_parameters ]
         self.agent_var_sorted= [ (agent.name, agent.controlled_parameters) for agent in agents ]
@@ -42,6 +42,19 @@ class CriticMergeAndOnlyFC:
         # copy weights from Q -> target Q
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(m_param.data)
+        # init optimizer and loss
+        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = lr)
+        self.loss      = torch.nn.MSELoss()
+
+
+    def compute_loss_and_optimize(self, q_tensor, y_tensor):
+        """
+        Computes the loss, backpropagates this and applies on step by the optimizer.
+        """
+        L = self.loss(q_tensor, y_tensor.detach())
+        L.backward()
+        self.optimizer.step()
+        return L
 
 
     def prepare_state_dict(self, current_state):
@@ -129,4 +142,12 @@ class CriticMergeAndOnlyFC:
         """
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_( (1-tau) * mtarget_param.data + tau * m_param.data)
+
+    def save_models_to_disk(self, storage_dir, prefix=""):
+        torch.save(self.model, os.path.join(storage_dir, prefix + "critic_model.pickle"))
+        torch.save(self.model_target, os.path.join(storage_dir, prefix + "critic_model_target.pickle"))
+
+    def load_models_from_disk(self, storage_dir, prefix=""):
+        self.model = torch.load(os.path.join(storage_dir, prefix + "critic_model.pickle"))
+        self.model_target= torch.load(os.path.join(storage_dir, prefix + "critic_model_target.pickle"))
 
