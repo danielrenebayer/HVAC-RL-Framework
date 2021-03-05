@@ -2,11 +2,12 @@
 import torch
 import datetime
 import numpy as np
+from copy import deepcopy
 
 from ReplayBuffer import ReplayBuffer
 import StateUtilities as SU
 
-def ddpg_episode(building, building_occ, agents, critic, output_lists, episode_number = 0):
+def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, episode_number = 0):
     #
     # define the hyper-parameters
     LAMBDA_REWARD_ENERGY = 0.1
@@ -18,16 +19,13 @@ def ddpg_episode(building, building_occ, agents, critic, output_lists, episode_n
     LEARNING_RATE = 0.001
     #
     # Define the replay ReplayBuffer
-    rpb = ReplayBuffer(RPB_BUFFER_SIZE)
+    rpb = ReplayBuffer(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # prepare the simulation
     state = building.model.reset()
     SU.expand_state_timeinfo_temp(state, building)
     normalized_state = SU.normalize_variables_in_dict(state)
     #
-    # initialize the losses and optimizers
-    critic_loss_mse = torch.nn.MSELoss()
-    critic_optimizer = torch.optim.Adam(params = critic.model.parameters(), lr = LEARNING_RATE)
     #
     current_occupancy = building_occ.draw_sample(datetime.datetime(2020, 1, 1, 0, 0))
     timestep   = 0
@@ -84,15 +82,15 @@ def ddpg_episode(building, building_occ, agents, critic, output_lists, episode_n
         #
         # request new actions from all agents
         agent_actions = {}
-        agent_input_tensors = {}
-        agent_output_tensors= {}
+        agent_input_ten_list = []
+        agent_output_ten_list= []
         for agent in agents:
             state_subset = SU.retrieve_substate_for_agent(normalized_state, agent, building)
             # send modified state and obtain new actions
             new_actions_ten, new_actions_dict, input_for_agent = agent.step(state_subset, add_ou=True)
             agent_actions[agent.name]        = new_actions_dict
-            agent_output_tensors[agent.name] = new_actions_ten.detach()
-            agent_input_tensors[agent.name]  = input_for_agent.detach()
+            agent_output_ten_list.append(new_actions_ten.detach() )
+            agent_input_ten_list.append( input_for_agent.detach() )
 
         #
         # merge actions from all agents and convert them to actions from COBS/EPlus
@@ -162,83 +160,73 @@ def ddpg_episode(building, building_occ, agents, critic, output_lists, episode_n
         #     - "critic input state tensor"         for the last and the current state,
         #     - "critic merged agent action tensor" for the last state
         #     - "agents input state tensors"        for the current state
-        agents_input_state_tensors_fcs = {agent.name: agent.prepare_state_dict(SU.retrieve_substate_for_agent(normalized_state, agent, building)) for agent in agents}
-        critic_input_state_tensor_fcs = critic.prepare_state_dict(normalized_state)
-        critic_input_state_tensor_fls = critic.prepare_state_dict(normalized_last_state)
-        critic_merged_agend_action_ten= critic.prepare_action_dict(agent_actions)
+        agent_input_ten_list_next_state = []
+        for agent in agents:
+            ainp = SU.retrieve_substate_for_agent(normalized_state, agent, building)
+            agent_input_ten_list_next_state.append( agent.prepare_state_dict( ainp ) )
+        critic_state_inp_ten_list = []
+        critic_state_inp_ten_list_next_state = []
+        critic_merged_action_inp_ten_list = []
+        for critic in critics:
+            critic_state_inp_ten_list.append(
+                critic.prepare_state_dict(normalized_last_state)
+            )
+            critic_state_inp_ten_list_next_state.append(
+                critic.prepare_state_dict(normalized_state)
+            )
+            critic_merged_action_inp_ten_list.append(
+                critic.prepare_action_dict(agent_actions)
+            )
         #   save to ReplayBuffer
         rpb.add_transition(
-            {"normalized state": normalized_last_state,
-             "agents input state tensors": agent_input_tensors,
-             "critic input state tensor": critic_input_state_tensor_fls},
-            {"agent output tensors": agent_output_tensors,
-             "critic merged agent action tensor": critic_merged_agend_action_ten},
-            reward,
-            {"normalized state": normalized_state,
-             "agents input state tensors": agents_input_state_tensors_fcs,
-             "critic input state tensor": critic_input_state_tensor_fcs}
+            state1_agents_inp  = agent_input_ten_list,
+            state1_critics_inp = critic_state_inp_ten_list,
+            actions_agents_outp= agent_output_ten_list,
+            actions_critics_merged_inp=critic_merged_action_inp_ten_list,
+            reward = reward,
+            state2_agents_inp  = agent_input_ten_list_next_state,
+            state2_critics_inp = critic_state_inp_ten_list_next_state
         )
 
         #
         # sample minibatch
-        batch_state1, batch_action, batch_reward, batch_state2 = rpb.sample_minibatch(BATCH_SIZE)
+        (b_ag_inp1, b_cr_inp1), (b_ag_out, b_cr_ac_in), b_reward, (b_ag_inp2, b_cr_inp2) = rpb.sample_minibatch(BATCH_SIZE)
 
         #
         # compute y and update critic
         #  s_{i+1} <- state2; s_i <- state1
-        critic.model.zero_grad()
-        #  compute mu'(s_{i+1})
-        agent_outputs = []
-        for agent in agents:
-            agent_tensor_list = []
-            for batch_element in batch_state2:
-                agent_tensor_list.append(batch_element["agents input state tensors"][agent.name])
-            #print(agent_tensor_list[0].shape)
-            agent_tensor = torch.cat(agent_tensor_list)
-            agent_outputs.append( agent.step_tensor(agent_tensor, use_actor=False) )
-        agent_outputs_ten = torch.cat(agent_outputs, dim=1)
-        #  merge vector for critic input state
-        critic_input_state2_tensor = []
-        for batch_element in batch_state2:
-            critic_input_state2_tensor.append(batch_element["critic input state tensor"])
-        critic_input_state2_tensor = torch.cat(critic_input_state2_tensor)
-        y = batch_reward + DISCOUNT_FACTOR * critic.forward_tensor(critic_input_state2_tensor, agent_outputs_ten, no_target=False)
-        #  compute Q(s_i, a_i)
-        critic_input_state1_list = []
-        for batch_element in batch_state1:
-            critic_input_state1_list.append(batch_element["critic input state tensor"])
-        critic_input_action_list = []
-        for batch_element in batch_action:
-            critic_input_action_list.append(batch_element["critic merged agent action tensor"])
-        critic_input_state1_ten = torch.cat(critic_input_state1_list).detach()
-        critic_input_action_ten = torch.cat(critic_input_action_list).detach()
-        q_val = critic.forward_tensor(critic_input_state1_ten, critic_input_action_ten, no_target=True)
-        #  update critic by maximizing L
-        critic_loss_value = critic_loss_mse(y.detach(), q_val)
-        critic_loss_value.backward()
-        critic_optimizer.step()
-
+        # compute mu'(s_{i+1})
+        output_loss_list = []
+        ag_out_target_s2 = []
+        for agent, agent_input in zip(agents, b_ag_inp2):
+            tmp = agent.step_tensor(agent_input, use_actor=False)
+            ag_out_target_s2.append( tmp )
+        ag_out_target_s2 = torch.cat(ag_out_target_s2, dim=1)
+        for critic, critic_input2, critic_input1, critic_action_in in zip(critics, b_cr_inp2, b_cr_inp1, b_cr_ac_in):
+            critic.model.zero_grad()
+            # compute y_j
+            y_critic = b_reward + DISCOUNT_FACTOR * critic.forward_tensor(critic_input2, ag_out_target_s2, no_target=False)
+            # compute Q_j
+            q = critic.forward_tensor(critic_input1, critic_action_in, True)
+            # update critic by minimizing the loss L
+            L = critic.compute_loss_and_optimize(q, y_critic)
+            output_loss_list.append(float(L.detach().numpy()))
         #
         # update actor policies
-        agent_outputs = []
-        for agent in agents:
+        agent_idx = 0
+        for agent, critic, agent_inp critic_input1, critic_action_in in zip(agents, critics, b_ag_inp1, b_cr_inp1, b_cr_ac_in):
             agent.model_actor.zero_grad()
-            agent_input_list = []
-            for batch_element in batch_state1:
-                agent_input_list.append( batch_element["agents input state tensors"][agent.name] )
-            agent_output = agent.step_tensor( torch.cat(agent_input_list) )
-            agent_outputs.append(agent_output)
-        agent_outputs_ten = torch.cat(agent_outputs, dim=1)
-        critic_output_for_gradient = -critic.forward_tensor(critic_input_state1_ten.detach(), agent_outputs_ten)
-        critic_loss_mean = critic_output_for_gradient.mean()
-        critic_loss_mean.backward()
-        for agent in agents:
+            critic_action_in = deepcopy(critic_action_in)
+            critic_action_in[agent_idx] = agent.step_tensor(agent_inp) # ob das so geht???
+            crloss = -critic.forward_tensor(critic_input1, critic_action_in)
+            crloss.mean().backward()
             agent.optimizer_step()
-
+            agent_idx += 1
 
         #
         # update target critic
-        critic.update_target_network(TAU_TARGET_NETWORKS)
+        for critic in critics:
+            critic.update_target_network(TAU_TARGET_NETWORKS)
 
         #
         # update target network for actor
@@ -247,7 +235,7 @@ def ddpg_episode(building, building_occ, agents, critic, output_lists, episode_n
 
         #
         # store losses in the loss list
-        output_lists["loss_list"].append({"Critic Loss": float(critic_loss_value.detach().numpy())})
+        output_lists["loss_list"].append(output_loss_list)
 
         if timestep % 20 == 0:
             print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
