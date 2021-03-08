@@ -23,10 +23,15 @@ variable_ranges = {
 
 def normalize_variable(v, varname):
     vmin, vmax = variable_ranges[varname]
-    return (v - vmin) / (vmax - vmin)
+    v = (v - vmin) / (vmax - vmin)
+    if   v < 0: return 0.0
+    elif v > 1: return 1.0
+    return v
 
 
 def backtransform_variable(v, varname):
+    if   v < 0: v = 0.0
+    elif v > 1: v = 1.0
     vmin, vmax = variable_ranges[varname]
     return (v - vmin) / (vmax - vmin)
 
