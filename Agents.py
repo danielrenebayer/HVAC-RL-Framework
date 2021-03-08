@@ -54,17 +54,36 @@ class AgentRL:
         self.controlled_parameters = []
         self.model_actor = None
         self.model_target= None
+        self.trafo_matrix= None
         self.initialized = False
         self.name = ""
+        self.controlled_element = ""
         self.optimizer = None
         self.ou_process= None
 
-    def initialize(self, name, lr = 0.001):
+    def initialize(self, name, controlled_element, global_state_keys, lr = 0.001):
+        """
+        Initializes the agent.
+        This function should be callen after the creation of the object and the
+        corret set of the input / output variables.
+
+        Parameters
+        ----------
+        name : str
+            The name of the agent.
+        controlled_element : str
+            The name of the element (as uniquly named in the building), that is controlled.
+        global_state_keys : list of str
+            The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
+        lr : float
+            The learning rate.
+        """
         if len(self.input_parameters) == 0 or len(self.controlled_parameters) == 0:
             raise RuntimeError("The number of input and output parameters has to be greater than 0")
         self.initialized = True
         self.name = name
-        
+        self.controlled_element = controlled_element
+
         input_size  = len(self.input_parameters)
         output_size = len(self.controlled_parameters)
         hidden_size = (2*input_size+output_size) // 3
@@ -93,7 +112,21 @@ class AgentRL:
         # initialize the OU-Process
         self.ou_process = OrnsteinUhlenbeckProcess(theta = 0.15, mu = 0.0, sigma = 0.2,
                                                    size  = output_size)
-        
+
+        # define the transformation matrix
+        trafo_list = []
+        for input_param in self.input_parameters:
+            try:
+                idx = global_state_keys.index(input_param) # this may rise a ValueError
+            except ValueError:
+                # if a ValueError occurs, the element is not in the list
+                # this means, that we have to add the name of the controlled device
+                # in front of the input parameter to find the element
+                idx = global_state_keys.index(f"{self.controlled_element} {input_param}")
+            row = torch.zeros(len(global_state_keys))
+            row[idx] = 1.0
+            trafo_list.append(row)
+        self.trafo_matrix = torch.stack(trafo_list).T
 
     def optimizer_step(self):
         """
@@ -114,24 +147,43 @@ class AgentRL:
         elif type(current_state) == list:
             raise NotImplemented("This function should be implemented to be used.")
 
-    def step_tensor(self, state_tensor, use_actor = True):
+    def step_tensor(self, state_tensor, use_actor = True, add_ou = False):
         """
         Computes the next step and outputs the resulting torch tensor.
-        
+
         Parameters
         ---------
         state_tensor : torch.tensor
-            the state tensor for the agent
+            The global state tensor.
         use_actor : Boolean
             If set to true, it will use the actor model for infering the next state, otherwise
             it will use the target network.
             Defaults to True.
+        add_ou : Boolean
+            If set to true, it will add the result of the OU-process to the output.
+            Defaults to False.
         """
+        if type(state_tensor) == list:
+            state_tensor = torch.cat(state_tensor, dim=0)
+        input_tensor = torch.matmul(state_tensor, self.trafo_matrix)
         if use_actor:
-            return self.model_actor(state_tensor)
+            output_tensor  = self.model_actor(input_tensor)
         else:
-            return self.model_target(state_tensor)
+            output_tensor  = self.model_target(input_tensor)
+        if add_ou:
+            ou_sample      = self.ou_process.sample()
+            output_tensor += torch.from_numpy(ou_sample[np.newaxis, :])
+        return output_tensor
 
+    def output_tensor_to_action_dict(self, output_tensor):
+        np_tensor = output_tensor.detach().numpy()
+        if len(np_tensor.shape) > 1:
+            # in this case we have more batches; we only want the first one
+            np_tensor = np_tensor[0, :]
+        output_dict = {}
+        for idx, cp in enumerate(self.controlled_parameters):
+            output_dict[cp] = np_tensor[idx]
+        return output_dict
 
     def step(self, current_state, use_actor = True, add_ou = False):
         """
@@ -145,9 +197,7 @@ class AgentRL:
             If set to true, it will use the actor model for infering the next state, otherwise
             it will use the target network.
             Defaults to True.
-        add_ou : Boolean
-            If set to true, it will add the result of the OU-process to the output.
-            Defaults to False.
+        
         """
         if not self.initialized:
             raise RuntimeError("Agent is not initialized.")
@@ -156,16 +206,10 @@ class AgentRL:
         input_ten = self.prepare_state_dict(current_state)
         #
         # apply function approximator (i.e. neural network)
-        output_ten = self.step_tensor(input_ten, use_actor)
-        if add_ou:
-            ou_sample  = self.ou_process.sample()
-            output_ten = output_ten + torch.from_numpy(ou_sample[np.newaxis, :])
+        output_ten = self.step_tensor(input_ten, use_actor, add_ou)
         #
         # output as dict
-        output_vec = output_ten.detach().numpy()[0, :]
-        output_dic = {}
-        for idx, cp in enumerate(self.controlled_parameters):
-            output_dic[cp] = output_vec[idx]
+        output_dic = self.output_tensor_to_action_dict(output_ten)
         return output_ten, output_dic, input_ten
     
     def update_target_network(self, tau = 0.01):
