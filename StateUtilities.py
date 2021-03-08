@@ -1,5 +1,6 @@
 
 from copy import deepcopy
+import torch
 
 
 variable_ranges = {
@@ -77,6 +78,28 @@ def expand_state_timeinfo_temp(state, building):
     # expand temperature for all zones
     for r in building.room_names:
         state[f"{r} Zone Temperature"] = state["temperature"][r]
+
+
+def normalized_state_to_tensor(state, building):
+    """
+    Transforms a state dict to a pytorch tensor.
+    The function ensures the correct ordering of the elements according to the list building.global_state_variables.
+
+    It expects a **normalized** state as input.
+    """
+    ten = [[ state[sval] for sval in building.global_state_variables ]]
+    return torch.tensor(ten)
+
+
+def unnormalized_state_to_tensor(state, building):
+    """
+    Transforms a state dict to a pytorch tensor.
+    The function ensures the correct ordering of the elements according to the list building.global_state_variables.
+
+    It expects a **unnormalized** state as input.
+    """
+    expand_state_timeinfo_temp(state, building)
+    return normalized_state_to_tensor(normalize_variables_in_dict(state), building)
 
 
 def retrieve_substate_for_agent(normalized_state, agent, building):
