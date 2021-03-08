@@ -12,7 +12,22 @@ class CriticMergeAndOnlyFC:
     The state and the action vector are merged.
     """
     
-    def __init__(self, input_variables, agents, hidden_size, lr=0.001):
+    def __init__(self, input_variables, agents, hidden_size, global_state_keys, lr=0.001):
+        """
+        Initializes a critic, that contains a fully-connected neural network, that merges
+        state and action vectors together.
+
+        Parameters
+        ----------
+        input_variables : list of str
+            The list of input variables
+        agents : list(Agent)
+            The list of agents, which input is passed to the critic
+        hidden_size : int
+            The size of the hidden layers
+        global_state_keys : list of str
+            The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
+        """
         self.input_variables = input_variables
         self.agent_variables = [ f"{agent.name} {controlled_var}" for agent in agents for controlled_var in agent.controlled_parameters ]
         self.agent_var_sorted= [ (agent.name, agent.controlled_parameters) for agent in agents ]
@@ -45,6 +60,14 @@ class CriticMergeAndOnlyFC:
         # init optimizer and loss
         self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = lr)
         self.loss      = torch.nn.MSELoss()
+        # define the transformation matrix
+        trafo_list = []
+        for input_param in input_variables:
+            idx = global_state_keys.index(input_param)
+            row = torch.zeros(len(global_state_keys))
+            row[idx] = 1.0
+            trafo_list.append(row)
+        self.trafo_matrix = torch.stack(trafo_list).T
 
 
     def compute_loss_and_optimize(self, q_tensor, y_tensor):
@@ -84,8 +107,13 @@ class CriticMergeAndOnlyFC:
         
         For parameter reference see forward()
         """
+        if type(state_tensor) == list:
+            state_tensor = torch.cat(state_tensor, dim=0)
+        if type(all_actions_tensor) == list:
+            all_actions_tensor = torch.cat(all_actions_tensor, dim=1)
         # cat state tensor and action tensor
-        input_ten = torch.cat([state_tensor, all_actions_tensor], dim=1)
+        state_tensor = torch.matmul(state_tensor, self.trafo_matrix)
+        input_ten = torch.cat([state_tensor, all_actions_tensor], dim=1).detach()
         if no_target:
             return self.model(input_ten)
         else:
