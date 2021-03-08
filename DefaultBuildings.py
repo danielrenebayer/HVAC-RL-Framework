@@ -114,6 +114,13 @@ class Building_5ZoneAirCooled:
                                     {"Number of People Schedule Name": f"OCC-SCHEDULE-{r}",
                                      "Number of People": 50})
         #
+        # list all state variables
+        self.global_state_variables = ["Minutes of Day", "Day of Week", "Calendar Week"]
+        for r in self.room_names:
+            self.global_state_variables.append(f"{r} Zone Temperature")
+        for _, varname in self.eplus_extra_states.items():
+            self.global_state_variables.append(varname)
+        #
         # make model a instance variable
         self.model = model
         self.cobs_model = model
