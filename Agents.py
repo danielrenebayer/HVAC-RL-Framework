@@ -39,6 +39,32 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
+    elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
+        new_agent = AgentRL(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Calendar Week",
+            "Outdoor Air Temperature",
+            "Outdoor Air Humidity",
+            "Outdoor Wind Speed",
+            'Outdoor Wind Direction',
+            'Outdoor Solar Radi Diffuse',
+            'Outdoor Solar Radi Direct']
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.input_parameters.extend([
+                f"{zone} Zone Relative Humidity",
+                f"{zone} Zone VAV Reheat Damper Position",
+                f"{zone} Zone CO2",
+                f"{zone} Zone People Count",
+                f"{zone} Zone Temperature"])
+        new_agent.controlled_parameters = []
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.controlled_parameters.extend([
+                f"{zone} Zone VAV Reheat Damper Position",
+                f"{zone} Zone Heating/Cooling-Mean Setpoint",
+                f"{zone} Zone Heating/Cooling-Delta Setpoint"])
+
     else:
         raise AttributeError(f"Unknown zone class: {zone_class}")
     return new_agent
