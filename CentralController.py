@@ -86,43 +86,12 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, episo
         for agent in agents:
             new_action = agent.step_tensor(norm_state_ten, use_actor = True, add_ou = True)
             agent_actions_list.append( new_action )
-            agent_actions_dict[agent.name] = agent.output_tensor_to_action_dict(new_action)
+            new_action_dict = agent.output_tensor_to_action_dict(new_action)
+            agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
 
         #
-        # merge actions from all agents and convert them to actions from COBS/EPlus
-        # TODO: this should be moved to the building
-        for agent_name, ag_actions in agent_actions_dict.items():
-            ag_actions = SU.backtransform_variables_in_dict(ag_actions)
-            controlled_group, _ = building.agent_device_pairing[agent.name]
-            if "VAV Reheat Damper Position" in ag_actions.keys():
-                action_val = ag_actions["VAV Reheat Damper Position"]
-                actions.append({"priority": 0,
-                                "component_type": "Schedule:Constant",
-                                "control_type": "Schedule Value",
-                                "actuator_key": f"{controlled_group} VAV Customized Schedule",
-                                "value": action_val,
-                                "start_time": state['timestep'] + 1})
-            if "Zone Heating/Cooling-Mean Setpoint"  in ag_actions.keys() and \
-            "Zone Heating/Cooling-Delta Setpoint" in ag_actions.keys():
-                mean_temp_sp = ag_actions["Zone Heating/Cooling-Mean Setpoint"]
-                delta = ag_actions["Zone Heating/Cooling-Delta Setpoint"]
-                if delta < 0.1: delta = 0.1
-                actions.append({"value":      mean_temp_sp - delta,
-                                "start_time": timestep + 1,
-                                "priority":   0,
-                                "component_type": "Zone Temperature Control",
-                                "control_type":   "Heating Setpoint",
-                                "actuator_key":   controlled_group})
-                actions.append({"value":      mean_temp_sp + delta,
-                                "start_time": timestep + 1,
-                                "priority":   0,
-                                "component_type": "Zone Temperature Control",
-                                "control_type":   "Cooling Setpoint",
-                                "actuator_key":   controlled_group})
-            # ... das macht jetzt keinen Sinn mehr, eine Prüfung wäre aber vielleicht nicht schlecht
-            #else:
-            #    print(f"Action {action_name} from agent in zone {zone} unknown.")
-
+        # send agent actions to the building object and obtaion the actions for COBS/eplus
+        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
 
         #
         # send actions to EnergyPlus and obtian the new state
