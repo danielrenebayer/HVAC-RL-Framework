@@ -7,17 +7,25 @@ from copy import deepcopy
 from ReplayBuffer import ReplayBufferStd
 import StateUtilities as SU
 
-def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, episode_number = 0, aux_output = {}):
+def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0, aux_output = {}):
     #
     # define the hyper-parameters
-    LAMBDA_REWARD_ENERGY = 0.1
-    LAMBDA_REWARD_MANU_STP_CHANGES = 150
-    TAU_TARGET_NETWORKS = 0.01
-    DISCOUNT_FACTOR = 0.9
-    BATCH_SIZE = 128
-    #RPB_BUFFER_SIZE = 12*24*30 # 30 Tage
-    RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
-    LEARNING_RATE = 0.001
+    if hyper_params is None:
+        LAMBDA_REWARD_ENERGY = 0.1
+        LAMBDA_REWARD_MANU_STP_CHANGES = 150
+        TAU_TARGET_NETWORKS = 0.01
+        DISCOUNT_FACTOR = 0.9
+        BATCH_SIZE = 128
+        RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
+        LEARNING_RATE = 0.01
+    else:
+        LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
+        LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
+        TAU_TARGET_NETWORKS  = hyper_params.tau
+        DISCOUNT_FACTOR = hyper_params.discount_factor
+        BATCH_SIZE      = hyper_params.batch_size
+        RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
+        LEARNING_RATE   = hyper_params.lr
     #
     # Define the replay ReplayBuffer
     rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
@@ -26,7 +34,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, episo
     state = building.model.reset()
     norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
     #
-    #
+    # TODO: get occupancy for the correct day (this is not important, because the occ at night is always 0)
     current_occupancy = building_occ.draw_sample(datetime.datetime(2020, 1, 1, 0, 0))
     timestep   = 0
     last_state = None
