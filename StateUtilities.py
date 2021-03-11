@@ -18,23 +18,23 @@ variable_ranges = {
     "Zone CO2":                (410.0, 5000.0),
     "Zone Temperature":        ( 10.0,   40.0),
     "Zone Heating/Cooling-Mean Setpoint": ( 14.0,30.0),
-    "Zone Heating/Cooling-Delta Setpoint":(-10.0,10.0)
+    "Zone Heating/Cooling-Delta Setpoint":(  0.1,10.0)
 }
 
 
 def normalize_variable(v, varname):
     vmin, vmax = variable_ranges[varname]
-    v = (v - vmin) / (vmax - vmin)
-    if   v < 0: return 0.0
+    v = 2 * (v - vmin) / (vmax - vmin) - 1
+    if   v <-1: return-1.0
     elif v > 1: return 1.0
     return v
 
 
-def backtransform_variable(v, varname):
-    if   v < 0: v = 0.0
-    elif v > 1: v = 1.0
+def backtransform_variable(vi, varname):
+    if   vi < -1: vi = -1.0
+    elif vi >  1: vi =  1.0
     vmin, vmax = variable_ranges[varname]
-    return (v - vmin) / (vmax - vmin)
+    return (vi + 1) * (vmax - vmin) / 2 + vmin
 
 
 def normalize_variables_in_dict(vardict, inplace=False):
