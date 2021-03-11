@@ -60,7 +60,7 @@ class ReplayBufferStd:
             b_actions.append(self._replay_list_actions[i])
         return b_state1, \
                b_actions,\
-               torch.cat([ torch.cat(a, dim=1) for a in b_actions ]), \
+               torch.cat([ torch.cat(a, dim=1) for a in b_actions ]).detach(), \
                self._replay_ten_rewards[indexes, :], \
                b_state2
 

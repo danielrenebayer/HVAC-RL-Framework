@@ -3,6 +3,7 @@
 # One can find all critics, that are needed for DDPG
 #
 
+import os
 import torch
 import numpy as np
 
@@ -81,6 +82,8 @@ class CriticMergeAndOnlyFC:
     def compute_loss_and_optimize(self, q_tensor, y_tensor):
         """
         Computes the loss, backpropagates this and applies on step by the optimizer.
+
+        y_tensor will be detached to ensure proper backpropagation to the q network only.
         """
         L = self.loss(q_tensor, y_tensor.detach())
         L.backward()
@@ -123,8 +126,8 @@ class CriticMergeAndOnlyFC:
         if self.use_cuda:
             all_actions_tensor = all_actions_tensor.to(0)
             state_tensor       = state_tensor.to(0)
-        state_tensor = torch.matmul(state_tensor, self.trafo_matrix)
-        input_ten = torch.cat([state_tensor, all_actions_tensor], dim=1).detach()
+        state_tensor = torch.matmul(state_tensor, self.trafo_matrix).detach()
+        input_ten = torch.cat([state_tensor, all_actions_tensor], dim=1)
         if no_target:
             output_tensor = self.model(input_ten)
         else:
