@@ -87,7 +87,7 @@ class AgentRL:
         self.optimizer = None
         self.ou_process= None
 
-    def initialize(self, name, controlled_element, global_state_keys, lr = 0.001):
+    def initialize(self, name, controlled_element, global_state_keys, args = None):
         """
         Initializes the agent.
         This function should be callen after the creation of the object and the
@@ -101,14 +101,19 @@ class AgentRL:
             The name of the element (as uniquly named in the building), that is controlled.
         global_state_keys : list of str
             The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
-        lr : float
-            The learning rate.
+        args : argparse
+            Additional arguments, optional.
         """
         if len(self.input_parameters) == 0 or len(self.controlled_parameters) == 0:
             raise RuntimeError("The number of input and output parameters has to be greater than 0")
         self.initialized = True
         self.name = name
         self.controlled_element = controlled_element
+        self.use_cuda = torch.cuda.is_available() if args is None else args.use_cuda
+        self.lr     = 0.001 if args is None else args.lr
+        self.ou_theta = 0.3 if args is None else args.ou_theta
+        self.ou_mu    = 0.0 if args is None else args.ou_mu
+        self.ou_sigma = 0.3 if args is None else args.ou_sigma
 
         input_size  = len(self.input_parameters)
         output_size = len(self.controlled_parameters)
@@ -133,10 +138,12 @@ class AgentRL:
             mtarget_param.data.copy_(mactor_param.data)
 
         # initialize the optimizer
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = lr)
+        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr)
 
         # initialize the OU-Process
-        self.ou_process = OrnsteinUhlenbeckProcess(theta = 0.15, mu = 0.0, sigma = 0.2,
+        self.ou_process = OrnsteinUhlenbeckProcess(theta = self.ou_theta,
+                                                   mu    = self.ou_mu,
+                                                   sigma = self.ou_sigma,
                                                    size  = output_size)
 
         # define the transformation matrix
@@ -153,6 +160,12 @@ class AgentRL:
             row[idx] = 1.0
             trafo_list.append(row)
         self.trafo_matrix = torch.stack(trafo_list).T
+
+        # Move things to GPU, if selected
+        if self.use_cuda:
+            self.model_actor = self.model_actor.to(0)
+            self.model_target= self.model_target.to(0)
+            self.trafo_matrix = self.trafo_matrix.to(0)
 
     def optimizer_step(self):
         """
@@ -191,13 +204,18 @@ class AgentRL:
         """
         if type(state_tensor) == list:
             state_tensor = torch.cat(state_tensor, dim=0)
+        if self.use_cuda:
+            state_tensor = state_tensor.to(0)
         input_tensor = torch.matmul(state_tensor, self.trafo_matrix)
         if use_actor:
             output_tensor  = self.model_actor(input_tensor)
         else:
             output_tensor  = self.model_target(input_tensor)
+        if self.use_cuda:
+            output_tensor  = output_tensor.cpu()
         if add_ou:
             ou_sample      = self.ou_process.sample()
+            ou_sample      = ou_sample.astype(np.float32) # we need this line for torch 1.2.0, torch 1.8.0 does not need this any more
             output_tensor += torch.from_numpy(ou_sample[np.newaxis, :])
         return output_tensor
 
