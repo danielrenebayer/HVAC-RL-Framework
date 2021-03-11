@@ -136,6 +136,12 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         #
         # loop over all [agent, critic]-pairs
         output_loss_list = []
+        output_q_st2_list= []
+        output_J_mean_list=[]
+        output_cr_frobnorm_mat_list = []
+        output_cr_frobnorm_bia_list = []
+        output_ag_frobnorm_mat_list = []
+        output_ag_frobnorm_bia_list = []
         for agent, critic in zip(agents, critics):
             #
             # compute y
@@ -146,21 +152,39 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
             mu_list = [ aInnerLoop.step_tensor(b_state2, use_actor = False) for aInnerLoop in agents ]
             aux_output["mu_list"] = mu_list
             #  2. compute y
-            y = b_reward.detach() + DISCOUNT_FACTOR * critic.forward_tensor(b_state2, mu_list, no_target = False)
-            # TODO: hier eventuell nochmal critic.model.zero_grad()
+            q_st2 = critic.forward_tensor(b_state2, mu_list, no_target = False)
+            y     = b_reward.detach() + DISCOUNT_FACTOR * q_st2
             # compute Q for state1
             q = critic.forward_tensor(b_state1, b_action_cat, no_target = True)
             # update critic by minimizing the loss L
             L = critic.compute_loss_and_optimize(q, y)
-            output_loss_list.append(float(L.detach().numpy()))
             #
             # update actor policies
             # policy loss = J
             mu_list = [ aInnerLoop.step_tensor(b_state1, add_ou = False) for aInnerLoop in agents ]
             agent.model_actor.zero_grad()
             policy_J = -critic.forward_tensor(b_state1, mu_list)
-            policy_J.mean().backward()
+            policy_J_mean = policy_J.mean()
+            policy_J_mean.backward()
             agent.optimizer_step()
+            #
+            # save outputs
+            output_loss_list.append(float(L.detach().numpy()))
+            output_q_st2_list.append(float(q_st2.detach().mean().numpy()))
+            output_J_mean_list.append(float(policy_J_mean.detach().numpy()))
+            # compute and store frobenius norms for the weights
+            cr_fnorm1, cr_fnorm2, ag_fnorm1, ag_fnorm2 = 0, 0, 0, 0
+            for p in critic.model.parameters():
+                if len(p.shape) == 1: cr_fnorm2 += float(p.cpu().norm().detach().cpu().numpy())
+                else: cr_fnorm1 += float(p.norm().detach().cpu().numpy())
+            for p in agent.model_actor.parameters():
+                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+            output_cr_frobnorm_mat_list.append( cr_fnorm1 )
+            output_cr_frobnorm_bia_list.append( cr_fnorm2 )
+            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
+
 
         #
         # update target critic
@@ -175,6 +199,12 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         #
         # store losses in the loss list
         output_lists["loss_list"].append(output_loss_list)
+        output_lists["q_st2_list"].append(output_q_st2_list)
+        output_lists["J_mean_list"].append(output_J_mean_list)
+        output_lists["cr_frobnorm_mat_list"].append(output_cr_frobnorm_mat_list)
+        output_lists["cr_frobnorm_bia_list"].append(output_cr_frobnorm_bia_list)
+        output_lists["ag_frobnorm_mat_list"].append(output_ag_frobnorm_mat_list)
+        output_lists["ag_frobnorm_bia_list"].append(output_ag_frobnorm_bia_list)
 
         if timestep % 20 == 0:
             print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
