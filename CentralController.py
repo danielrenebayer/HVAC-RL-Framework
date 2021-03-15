@@ -12,7 +12,7 @@ import StateUtilities as SU
 from Agents import agent_constructor
 import RLCritics
 
-def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0, aux_output = {}):
+def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -132,7 +132,6 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         #
         # save (last_state, actions, reward, state) to replay buffer
         rpb.add_transition(norm_state_ten_last, agent_actions_list, reward, norm_state_ten)
-        aux_output["rpb"] = rpb
 
         #
         # sample minibatch
@@ -153,9 +152,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
             #  Hint: s_{i+1} <- state2; s_i <- state1
             critic.model.zero_grad()
             #  1. compute mu'(s_{i+1})
-            aux_output["mu_list_input"] = b_state1
             mu_list = [ aInnerLoop.step_tensor(b_state2, use_actor = False) for aInnerLoop in agents ]
-            aux_output["mu_list"] = mu_list
             #  2. compute y
             q_st2 = critic.forward_tensor(b_state2, mu_list, no_target = False)
             y     = b_reward.detach() + DISCOUNT_FACTOR * q_st2
