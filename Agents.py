@@ -121,18 +121,27 @@ class AgentRL:
 
         self.model_actor = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden_size),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden_size, output_size)
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size, output_size),
+            torch.nn.Tanh()
         )
         self.model_target = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden_size),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden_size, output_size)
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size, output_size),
+            torch.nn.Tanh()
         )
+        # change initialization
+        for m_param in self.model_actor.parameters():
+            if len(m_param.shape) == 1:
+                # other initialization for biases
+                torch.nn.init.constant_(m_param, 0.001)
+            else:
+                torch.nn.init.normal_(m_param, 0.0, 1.0)
         # copy weights from actor -> target
         for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(mactor_param.data)

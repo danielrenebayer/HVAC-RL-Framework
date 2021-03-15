@@ -42,22 +42,35 @@ class CriticMergeAndOnlyFC:
         self.hidden_size = hidden_size
         self.lr          = 0.001 if args is None else args.lr
         self.use_cuda    = torch.cuda.is_available() if args is None else args.use_cuda
+        if not args is None and args.critic_hidden_activation == "LeakyReLU":
+            activation_fx     = torch.nn.LeakyReLU
+        else:
+            activation_fx     = torch.nn.Tanh
+        #if not args is None and args.critic_last_activation == "LeakyReLU":
+        #    activation_fx_end = torch.nn.LeakyReLU
+        #else:
+        #    activation_fx_end = torch.nn.Tanh
         self.model = torch.nn.Sequential(
             torch.nn.Linear(self.input_size, hidden_size),
-            torch.nn.ReLU(),
+            activation_fx(),
             torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden_size, 1),
-            torch.nn.ReLU()
+            activation_fx(),
+            torch.nn.Linear(hidden_size, 1)
         )
         self.model_target = torch.nn.Sequential(
             torch.nn.Linear(self.input_size, hidden_size),
-            torch.nn.ReLU(),
+            activation_fx(),
             torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden_size, 1),
-            torch.nn.ReLU()
+            activation_fx(),
+            torch.nn.Linear(hidden_size, 1)
         )
+        # change initialization
+        for m_param in self.model.parameters():
+            if len(m_param.shape) == 1:
+                # other initialization for biases
+                torch.nn.init.constant_(m_param, 0.001)
+            else:
+                torch.nn.init.normal_(m_param, 0.0, 1.0)
         # copy weights from Q -> target Q
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(m_param.data)
