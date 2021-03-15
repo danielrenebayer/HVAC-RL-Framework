@@ -1,11 +1,16 @@
 
+import os
 import torch
+import pickle
 import datetime
 import numpy as np
 from copy import deepcopy
 
 from ReplayBuffer import ReplayBufferStd
 import StateUtilities as SU
+
+from Agents import agent_constructor
+import RLCritics
 
 def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0, aux_output = {}):
     #
@@ -208,5 +213,95 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
 
         if timestep % 20 == 0:
             print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
+
+
+
+def run_for_n_episodes(n_episodes, building, building_occ, args):
+    """
+    Runs the ddpg algorithm (i.e. the above defined ddpg_episode_mc function)
+    for n_episodes runs.
+    The agents and critics will be initialized according to the building object.
+    """
+
+    #
+    # Define the agents
+    agents = []
+    # HINT: a device can be a zone, too
+    for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
+        new_agent = agent_constructor( controlled_device_type )
+        new_agent.initialize(
+                         name = agent_name,
+                         args = args,
+                         controlled_element = controlled_device,
+                         global_state_keys  = building.global_state_variables)
+        agents.append(new_agent)
+
+    #
+    # Define the critics
+    critics = []
+    ciritic_input_variables=["Minutes of Day","Day of Week","Calendar Week",
+                             "Outdoor Air Temperature","Outdoor Air Humidity",
+                             "Outdoor Wind Speed","Outdoor Wind Direction",
+                             "Outdoor Solar Radi Diffuse","Outdoor Solar Radi Direct"]
+    for vartype in ["Zone Temperature","Zone People Count",
+                    "Zone Relative Humidity",
+                    "Zone VAV Reheat Damper Position","Zone CO2"]:
+        ciritic_input_variables.extend( [f"SPACE{k}-1 {vartype}" for k in range(1,6)] )
+    for agent in agents:
+        new_critic = RLCritics.CriticMergeAndOnlyFC(
+                    args = args,
+                    input_variables=ciritic_input_variables,
+                    agents = agents,
+                    global_state_keys=building.global_state_variables)
+        critics.append(new_critic)
+
+    #
+    # Set model parameters
+    episode_len        = args.episode_length
+    episode_start_day  = args.episode_start_day
+    episode_start_month= args.episode_start_month
+    building.model.set_runperiod(episode_len, 2020, episode_start_month, episode_start_day)
+    building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
+
+    for n_episode in range(n_episodes):
+        output_lists = {
+            "episode_list": [],
+            "timestamp_list": [],
+            "loss_list": [],
+            "q_st2_list": [],
+            "J_mean_list": [],
+            "cr_frobnorm_mat_list": [],
+            "cr_frobnorm_bia_list": [],
+            "ag_frobnorm_mat_list": [],
+            "ag_frobnorm_bia_list": [],
+
+            "room_temp_list": [],
+            "outd_temp_list": [],
+            "outd_humi_list": [],
+            "outd_solar_radi_list": [],
+            "outd_wspeed_list": [],
+            "outd_wdir_list": [],
+            "occupancy_list": [],
+            "humidity_list": [],
+            "co2_ppm_list": [],
+            "energy_list": [],
+            "rewards_list": [],
+            "n_manual_stp_ch_list": [],
+
+            "vav_pos_list": []
+        }
+    
+        ddpg_episode_mc(building, building_occ, agents, critics, output_lists, args, n_episode)
+
+        # save agent/critic networks every selected run
+        if (n_episode+1) % args.network_storage_frequency == 0:
+            for agent in agents: agent.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
+            for critic in critics: critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
+        # save the output_lists
+        f = open(os.path.join(args.checkpoint_dir, f"epoch_{n_episode}_output_lists.pickle"), "wb")
+        pickle.dump(output_lists, f)
+        f.close()
+
+
 
 
