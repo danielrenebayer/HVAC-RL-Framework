@@ -1,5 +1,6 @@
 
 import argparse
+import datetime
 
 def get_argparser():
     """
@@ -23,6 +24,11 @@ def get_argparser():
     parser.add_argument('--episode_start_day', type=int, default=1)
     parser.add_argument('--episode_start_month', type=int, default=7)
     parser.add_argument('--critic_hidden_size', type=int, default=40)
+    parser.add_argument('--critic_hidden_activation', type=str, default="tanh", choices=["tanh","LeakyReLU"])
+    parser.add_argument('--critic_last_activation',   type=str, default="tanh", choices=["tanh","LeakyReLU"])
+    parser.add_argument('--network_storage_frequency',type=int, default=10, help="Number of episodes until the next storage of the networks (critcs and agents)")
+    parser.add_argument('--checkpoint_dir', type=str, default="checkpoints/" + datetime.datetime.now().strftime("%Y%m%d-%H%M"))
+    parser.add_argument('--model', type=str, default="5ZoneAirCooled", choices=["5ZoneAirCooled", "5ZoneAirCooled_SingleAgent"])
     parser.add_argument('--number_occupants', type=int, default=40)
 
     return parser
