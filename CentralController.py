@@ -12,7 +12,7 @@ import StateUtilities as SU
 from Agents import agent_constructor
 import RLCritics
 
-def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0):
+def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0, sqloutput = None, extended_logging = False):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -66,31 +66,6 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
                             "actuator_key":  f"OCC-SCHEDULE-{zonename}",
                             "value":           next_occupancy[zonename]["relative number occupants"],
                             "start_time":      state['timestep'] + 1})
-        
-        #
-        # Read current status and save this to the dictionaries and lists
-        # TODO: this is a function of the Building, should be located there
-        output_lists["episode_list"].append(episode_number)
-        output_lists["timestamp_list"].append(currdate)
-        output_lists["room_temp_list"].append(state["temperature"])
-        output_lists["occupancy_list"].append(current_occupancy)
-        output_lists["outd_temp_list"].append(state["Outdoor Air Temperature"])
-        output_lists["outd_humi_list"].append(state["Outdoor Air Humidity"])
-        output_lists["outd_wdir_list"].append(state["Outdoor Wind Direction"])
-        output_lists["outd_solar_radi_list"].append({
-            "Direct Radiation": state["Outdoor Solar Radi Direct"],
-            "Indirect Radiation": state["Outdoor Solar Radi Diffuse"]})
-        output_lists["outd_wspeed_list"].append(state["Outdoor Wind Speed"])
-        output_lists["energy_list"].append(   state["energy"])
-        output_lists["co2_ppm_list"].append( {e: state[f"{e} Zone CO2"] for e in
-                            [k.replace(' Zone CO2', "") for k in state.keys() if k.endswith(' Zone CO2')]} )
-        output_lists["humidity_list"].append( {e: state[f"{e} Zone Relative Humidity"] for e in
-                            [k.replace(' Zone Relative Humidity', "") for k in state.keys() if k.endswith(' Zone Relative Humidity')]} )
-        #
-        output_lists["vav_pos_list"].append( {e: state[f"{e} Zone VAV Reheat Damper Position"] for e in
-                            [k.replace(' Zone VAV Reheat Damper Position', "") for k in state.keys() if k.endswith(' Zone VAV Reheat Damper Position')]} )
-        
-
 
         #
         # request new actions from all agents
@@ -200,20 +175,27 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
 
         #
         # store losses in the loss list
-        output_lists["loss_list"].append(output_loss_list)
-        output_lists["q_st2_list"].append(output_q_st2_list)
-        output_lists["J_mean_list"].append(output_J_mean_list)
-        output_lists["cr_frobnorm_mat_list"].append(output_cr_frobnorm_mat_list)
-        output_lists["cr_frobnorm_bia_list"].append(output_cr_frobnorm_bia_list)
-        output_lists["ag_frobnorm_mat_list"].append(output_ag_frobnorm_mat_list)
-        output_lists["ag_frobnorm_bia_list"].append(output_ag_frobnorm_bia_list)
+        if not sqloutput is None:
+            sqloutput.add_every_step_of_episode( locals() )
+
+        #
+        # store detailed output, if extended logging is selected
+        if extended_logging and not sqloutput is None:
+            sqloutput.add_every_step_of_some_episodes( locals() )
 
         if timestep % 20 == 0:
             print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
 
+    #
+    # elements, that should be stored only once per episode
+    if not sqloutput is None:
+        sqloutput.add_last_step_of_episode( locals() )
 
 
-def run_for_n_episodes(n_episodes, building, building_occ, args):
+
+
+
+def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None):
     """
     Runs the ddpg algorithm (i.e. the above defined ddpg_episode_mc function)
     for n_episodes runs.
@@ -262,42 +244,32 @@ def run_for_n_episodes(n_episodes, building, building_occ, args):
 
     for n_episode in range(n_episodes):
         output_lists = {
-            "episode_list": [],
-            "timestamp_list": [],
-            "loss_list": [],
-            "q_st2_list": [],
-            "J_mean_list": [],
-            "cr_frobnorm_mat_list": [],
-            "cr_frobnorm_bia_list": [],
-            "ag_frobnorm_mat_list": [],
-            "ag_frobnorm_bia_list": [],
 
             "room_temp_list": [],
-            "outd_temp_list": [],
-            "outd_humi_list": [],
-            "outd_solar_radi_list": [],
-            "outd_wspeed_list": [],
-            "outd_wdir_list": [],
             "occupancy_list": [],
             "humidity_list": [],
             "co2_ppm_list": [],
-            "energy_list": [],
-            "rewards_list": [],
-            "n_manual_stp_ch_list": [],
 
             "vav_pos_list": []
         }
     
-        ddpg_episode_mc(building, building_occ, agents, critics, output_lists, args, n_episode)
+        ddpg_episode_mc(building,
+                        building_occ,
+                        agents,
+                        critics,
+                        output_lists,
+                        args,
+                        n_episode,
+                        sqloutput,
+                        (n_episode+1) % args.network_storage_frequency == 0)
 
         # save agent/critic networks every selected run
         if (n_episode+1) % args.network_storage_frequency == 0:
             for agent in agents: agent.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
             for critic in critics: critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
-        # save the output_lists
-        f = open(os.path.join(args.checkpoint_dir, f"epoch_{n_episode}_output_lists.pickle"), "wb")
-        pickle.dump(output_lists, f)
-        f.close()
+
+        # commit sql output if available
+        if not sqloutput is None: sqloutput.db.commit()
 
 
 
