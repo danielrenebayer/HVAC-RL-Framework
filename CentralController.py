@@ -114,6 +114,8 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         state      = building.model.step(actions)
         current_occupancy = next_occupancy
 
+        current_energy_Wh = state["energy"] / 360
+
         #
         # modify state
         norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
@@ -122,12 +124,10 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
         n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
-        output_lists["n_manual_stp_ch_list"].append(n_manual_stp_changes)
 
         #
         # reward computation
-        reward = -( LAMBDA_REWARD_ENERGY * state["energy"] + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
-        output_lists["rewards_list"].append(reward)
+        reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
 
         #
         # save (last_state, actions, reward, state) to replay buffer
