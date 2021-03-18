@@ -7,7 +7,7 @@ import cobs
 from global_paths import global_paths
 
 class Building_5ZoneAirCooled:
-    def __init__(self):
+    def __init__(self, args = None):
         #
         #
         self.room_names = [f'SPACE{i}-1' for i in range(1,6)]
@@ -61,8 +61,14 @@ class Building_5ZoneAirCooled:
             weather_file  = os.path.join(global_paths["COBS"], "cobs/data/weathers/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw"),
             #weather_file  = os.path.join(global_paths["COBS"], "cobs/data/weathers/1.epw"),
             eplus_naming_dict = self.eplus_extra_states,
-            eplus_var_types   = self.eplus_var_types
+            eplus_var_types   = self.eplus_var_types,
+            tmp_idf_path      = None if args is None else args.checkpoint_dir
         )
+        #
+        # Modify the model, if arguments are given
+        if not args is None:
+            idx = model.run_parameters.index("-d")
+            model.run_parameters[idx + 1] = os.path.join(args.checkpoint_dir, "result")
         #
         #
         # generate edd file (which lists the possible actions):
@@ -165,9 +171,9 @@ class Building_5ZoneAirCooled:
 
 
 class Building_5ZoneAirCooled_SingleAgent(Building_5ZoneAirCooled):
-    def __init__(self):
+    def __init__(self, args = None):
         #
-        super().__init__()
+        super().__init__(args)
         #
         # the pairing which gives, which agent (identified by name) controlles which device (or zone) and what kind of device it is
         self.agent_device_pairing = {"MainAgent":

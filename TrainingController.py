@@ -38,9 +38,9 @@ def main(args):
     #
     # Define the building and the occupants
     if args.model == "5ZoneAirCooled_SingleAgent":
-        building = Building_5ZoneAirCooled_SingleAgent()
+        building = Building_5ZoneAirCooled_SingleAgent(args)
     else:
-        building = Building_5ZoneAirCooled()
+        building = Building_5ZoneAirCooled(args)
     building_occ = BuildingOccupancy()
     building_occ.set_room_settings(building.room_names[:-1], {building.room_names[-1]: 40}, 40)
     building_occ.generate_random_occupants(args.number_occupants)
