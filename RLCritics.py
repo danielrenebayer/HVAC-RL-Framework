@@ -92,15 +92,16 @@ class CriticMergeAndOnlyFC:
             self.trafo_matrix = self.trafo_matrix.to(0)
 
 
-    def compute_loss_and_optimize(self, q_tensor, y_tensor):
+    def compute_loss_and_optimize(self, q_tensor, y_tensor, no_backprop = False):
         """
         Computes the loss, backpropagates this and applies on step by the optimizer.
 
         y_tensor will be detached to ensure proper backpropagation to the q network only.
         """
         L = self.loss(q_tensor, y_tensor.detach())
-        L.backward()
-        self.optimizer.step()
+        if not no_backprop:
+            L.backward()
+            self.optimizer.step()
         return L
 
 

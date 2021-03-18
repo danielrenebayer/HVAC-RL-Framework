@@ -12,7 +12,9 @@ import StateUtilities as SU
 from Agents import agent_constructor
 import RLCritics
 
-def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper_params = None, episode_number = 0, sqloutput = None, extended_logging = False):
+def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
+        hyper_params = None, episode_number = 0, sqloutput = None,
+        extended_logging = False, evaluation_epoch = False):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -72,7 +74,9 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
         agent_actions_dict = {}
         agent_actions_list = []
         for agent in agents:
-            new_action = agent.step_tensor(norm_state_ten, use_actor = True, add_ou = True)
+            new_action = agent.step_tensor(norm_state_ten,
+                                           use_actor = True,
+                                           add_ou    = not evaluation_epoch)
             agent_actions_list.append( new_action )
             new_action_dict = agent.output_tensor_to_action_dict(new_action)
             agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
@@ -134,7 +138,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
             # compute Q for state1
             q = critic.forward_tensor(b_state1, b_action_cat, no_target = True)
             # update critic by minimizing the loss L
-            L = critic.compute_loss_and_optimize(q, y)
+            L = critic.compute_loss_and_optimize(q, y, no_backprop = evaluation_epoch)
             #
             # update actor policies
             # policy loss = J
@@ -142,8 +146,9 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
             agent.model_actor.zero_grad()
             policy_J = -critic.forward_tensor(b_state1, mu_list)
             policy_J_mean = policy_J.mean()
-            policy_J_mean.backward()
-            agent.optimizer_step()
+            if not evaluation_epoch:
+                policy_J_mean.backward()
+                agent.optimizer_step()
             #
             # save outputs
             output_loss_list.append(float(L.detach().numpy()))
@@ -163,15 +168,16 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists, hyper
             output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
 
-        #
-        # update target critic
-        for critic in critics:
-            critic.update_target_network(TAU_TARGET_NETWORKS)
+        if not evaluation_epoch:
+            #
+            # update target critic
+            for critic in critics:
+                critic.update_target_network(TAU_TARGET_NETWORKS)
 
-        #
-        # update target network for actor
-        for agent in agents:
-            agent.update_target_network(TAU_TARGET_NETWORKS)
+            #
+            # update target network for actor
+            for agent in agents:
+                agent.update_target_network(TAU_TARGET_NETWORKS)
 
         #
         # store losses in the loss list
@@ -261,6 +267,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         args,
                         n_episode,
                         sqloutput,
+                        (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0)
 
         # save agent/critic networks every selected run
