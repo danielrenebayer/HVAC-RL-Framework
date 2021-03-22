@@ -31,6 +31,7 @@ class SQLOutput():
             "agent_nr": ["integer", None],
             "loss":     ["float",   "output_loss_list"],
             "q_st2":    ["float",   "output_q_st2_list"],
+            "J":        ["float",   "output_J_mean_list"],
             "frobnorm_agent_matr": ["float", "output_ag_frobnorm_mat_list"],
             "frobnorm_agent_bias": ["float", "output_ag_frobnorm_bia_list"],
             "frobnorm_critic_matr":["float", "output_cr_frobnorm_mat_list"],
