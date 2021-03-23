@@ -19,7 +19,7 @@ class SQLOutput():
             "episode": ["integer", "episode_number"],
             "step":    ["integer", "timestep"],
             "reward":  ["float",   "reward"],
-            "manual_stp_ch_n":   ["integer", "n_manual_stp_changes"],
+            "manual_stp_ch_n":   ["float", "n_manual_stp_changes"],
             #"manual_stp_ch_mag": ["integer", "mag_manual_stp_changes"],
             "energy_Wh":  ["float",   "current_energy_Wh"]
         }
@@ -121,13 +121,17 @@ class SQLOutput():
         self.db.execute(f"INSERT INTO {tablename}({colstr[:-1]}) VALUES({valstr[:-1]});")
 
 
-    def add_every_step_of_episode(self, local_vars):
+    # if ignore_agents is set to True, it will ignore the agent values
+    def add_every_step_of_episode(self, local_vars, ignore_agents = False):
         # get global data
         dict_for_db = {}
         for colname, (_, lvarname) in self.output_vars_eees.items():
             if not lvarname is None:
                 dict_for_db[colname] = local_vars[lvarname]
         self._propagate_to_db("eees", dict_for_db)
+        #
+        if ignore_agents:
+            return
         # actions for every agent
         for idx, agent in enumerate(local_vars["agents"]):
             dict_for_db = {}

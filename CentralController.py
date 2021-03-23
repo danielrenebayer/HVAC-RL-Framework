@@ -205,6 +205,127 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
 
 
 
+def one_baseline_episode(building, building_occ, args, sqloutput = None):
+    hyper_params = args
+    episode_number = 0
+    #
+    # define the hyper-parameters
+    if hyper_params is None:
+        LAMBDA_REWARD_ENERGY = 0.1
+        LAMBDA_REWARD_MANU_STP_CHANGES = 150
+        TAU_TARGET_NETWORKS = 0.01
+        DISCOUNT_FACTOR = 0.9
+        BATCH_SIZE = 128
+        RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
+        LEARNING_RATE = 0.01
+    else:
+        LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
+        LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
+        TAU_TARGET_NETWORKS  = hyper_params.tau
+        DISCOUNT_FACTOR = hyper_params.discount_factor
+        BATCH_SIZE      = hyper_params.batch_size
+        RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
+        LEARNING_RATE   = hyper_params.lr
+    #
+    # Set model parameters
+    episode_len        = args.episode_length
+    episode_start_day  = args.episode_start_day
+    episode_start_month= args.episode_start_month
+    building.model.set_runperiod(episode_len, 2020, episode_start_month, episode_start_day)
+    building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
+    #
+    # Define the agents
+    agents = []
+    for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
+        new_agent = agent_constructor( controlled_device_type[:-2] + "NoRL" )
+        new_agent.initialize(
+                         name = agent_name,
+                         controlled_element = controlled_device)
+        agents.append(new_agent)
+    #
+    # prepare the simulation
+    state = building.model.reset()
+    #
+    # TODO: get occupancy for the correct day (this is not important, because the occ at night is always 0)
+    current_occupancy = building_occ.draw_sample(datetime.datetime(2020, 1, 1, 0, 0))
+    timestep   = 0
+    last_state = None
+    # start the simulation loop
+    while not building.model.is_terminate():
+        actions = list()
+        
+        currdate = state['time']
+        currdate = datetime.datetime(year=2020, month=currdate.month, day=currdate.day, hour=currdate.hour,
+                                    minute=currdate.minute)
+        
+        #
+        # request occupancy for the next state
+        nextdate = state['time']
+        nextdate = datetime.datetime(year=2020, month=nextdate.month, day=nextdate.day, hour=nextdate.hour,
+                                    minute=nextdate.minute) + datetime.timedelta(minutes=5)
+        next_occupancy = building_occ.draw_sample(nextdate)
+        #
+        # propagate occupancy values to COBS / EnergyPlus
+        for zonename, occd in next_occupancy.items():
+            actions.append({"priority":        0,
+                            "component_type": "Schedule:Constant",
+                            "control_type":   "Schedule Value",
+                            "actuator_key":  f"OCC-SCHEDULE-{zonename}",
+                            "value":           next_occupancy[zonename]["relative number occupants"],
+                            "start_time":      state['timestep'] + 1})
+
+        #
+        # request new actions from all agents
+        agent_actions_dict = {}
+        for agent in agents:
+            agent_actions_dict[agent.name] = agent.step(state)
+
+        #
+        # send agent actions to the building object and obtaion the actions for COBS/eplus
+        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
+
+        #
+        # send actions to EnergyPlus and obtian the new state
+        last_state = state
+        timestep  += 1
+        state      = building.model.step(actions)
+        current_occupancy = next_occupancy
+
+        current_energy_Wh = state["energy"] / 360
+
+        # modify state
+        norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
+
+        #
+        # send current temp/humidity values for all rooms
+        # obtain number of manual setpoint changes
+        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
+
+        #
+        # reward computation
+        reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+
+        #
+        # store losses in the loss list
+        if not sqloutput is None:
+            sqloutput.add_every_step_of_episode( locals(), ignore_agents = True )
+
+        #
+        # store detailed output
+        if not sqloutput is None:
+            sqloutput.add_every_step_of_some_episodes( locals() )
+
+        if timestep % 20 == 0:
+            print(f"baseline episode, timestep {timestep:5}: {state['time']}")
+
+    # commit sql output if available
+    if not sqloutput is None: sqloutput.db.commit()
+
+
+
+
+
+
 def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None):
     """
     Runs the ddpg algorithm (i.e. the above defined ddpg_episode_mc function)

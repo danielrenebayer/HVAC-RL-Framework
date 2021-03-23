@@ -23,7 +23,7 @@ import cobs
 
 from BuildingOccupancy import BuildingOccupancy
 from DefaultBuildings import Building_5ZoneAirCooled_SingleAgent, Building_5ZoneAirCooled
-from CentralController import run_for_n_episodes
+from CentralController import run_for_n_episodes, one_baseline_episode
 from Options import get_argparser
 from SQLOutput import SQLOutput
 
@@ -60,7 +60,7 @@ def main(args):
         if arg_def != arg_val:
             arguments_text += f"{arg:30} {arg_val:20} [Default: {arg_def}]\n"
         else:
-            arguments_text += f"{arg:30} {arg_val}\n"
+            arguments_text += f"{arg:30} {arg_val:20}\n"
     f = open(os.path.join(args.checkpoint_dir, "options.txt"), "w")
     f.write(arguments_text)
     f.close()
@@ -69,8 +69,13 @@ def main(args):
     sqloutput.initialize()
 
     #
-    # run the model for n episodes
-    run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput)
+    # call the controlling function
+    if args.use_rule_based_agent:
+        # run one sample episode using the rule-based agent
+        one_baseline_episode(building, building_occ, args, sqloutput)
+    else:
+        # run the model for n episodes
+        run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput)
 
     sqloutput.db.commit()
     sqloutput.db.close()
