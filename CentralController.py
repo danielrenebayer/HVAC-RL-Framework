@@ -106,7 +106,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
+        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
 
         #
         # reward computation

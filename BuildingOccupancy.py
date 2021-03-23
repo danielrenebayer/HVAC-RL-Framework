@@ -608,19 +608,29 @@ class BuildingOccupancy:
         # TODO: diese Funktion genauer auf die Wuensche der Occupants abstimmen
         changed_setpoints = {}
         no_manual_setp_changes = 0
+        changed_magnitude = 0
 
         for office_name in self.office_rooms:
             if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
+                temp_values
                 # if the temperature is not in the range [20,24], change the setpoint
-                if temp_values[office_name] < 20 or temp_values[office_name] > 24:
+                if temp_values[office_name] < 20:
                     no_manual_setp_changes += 1
+                    changed_magnitude += 20 - temp_values[office_name]
+                elif temp_values[office_name] > 24:
+                    no_manual_setp_changes += 1
+                    changed_magnitude += temp_values[office_name] - 24
 
         for conf_room_name, _ in self.conference_rooms.items():
             if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
                 # if the temperature is not in the range [20,24], change the setpoint
-                if temp_values[office_name] < 20 or temp_values[office_name] > 24:
+                if temp_values[office_name] < 20:
                     no_manual_setp_changes += 1
+                    changed_magnitude += 20 - temp_values[office_name]
+                elif temp_values[office_name] > 24:
+                    no_manual_setp_changes += 1
+                    changed_magnitude += temp_values[office_name] - 24
 
-        return no_manual_setp_changes #, changed_setpoints
+        return no_manual_setp_changes, changed_magnitude
 
 
