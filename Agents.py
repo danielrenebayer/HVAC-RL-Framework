@@ -317,21 +317,27 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
     def __init__(self):
         super().__init__("VAV with Reheat,Heating,Cooling,NoRL")
 
+    def initialize(self, name, controlled_element):
+        self.name = name
+        self.controlled_element = controlled_element
+
     def step(self, current_state):
-        output_dic = {}
-        # ... do not do anything by default
-        #output_dic = {"VAV Reheat Damper Position": 0.8,
-        #              "Zone Heating/Cooling-Mean Setpoint": 22.0,
-        #              "Zone Heating/Cooling-Delta Setpoint": 2.0}
-        if current_state["Zone Relative Humidity"] > 0.7 or \
-           current_state["Zone CO2"] > 0.2332: # 1500 ppm
-            output_dic["VAV Reheat Damper Position"] = 1
-        if current_state["Zone Temperature"] > 0.5: # 25 degree C
-            output_dic["Zone Heating/Cooling-Mean Setpoint"] = 0.4
-            output_dic["Zone Heating/Cooling-Delta Setpoint"] = 0.1
-        elif current_state["Zone Temperature"] < 0.3: # 19 degree C
-            output_dic["Zone Heating/Cooling-Mean Setpoint"] = 0.4
-            output_dic["Zone Heating/Cooling-Delta Setpoint"] = 0.1
+        output_dic = {"VAV Reheat Damper Position":         0.75,
+                      "Zone Heating/Cooling-Mean Setpoint": 23.0,
+                      "Zone Heating/Cooling-Delta Setpoint": 7.0}
+        # set damper position to maximal value if humidity or co2 is high
+        if current_state[f"{self.controlled_element} Zone Relative Humidity"] > 0.8 or \
+           current_state[f"{self.controlled_element} Zone CO2"] > 1500: # ppm
+               output_dic["VAV Reheat Damper Position"] = 1.0
+        #
+        # rule based setting of the heating/cooling setpoint and delta
+        #  Mo - Fr, 7.00 - 18.00 h: 21.5 deg C, Delta 1 deg C
+        if current_state["time"].weekday() <= 4:
+            if current_state["time"].hour >= 7 and current_state["time"].hour <= 18:
+                output_dic["Zone Heating/Cooling-Mean Setpoint"] = 21.5
+                output_dic["Zone Heating/Cooling-Delta Setpoint"] = 1.0
+                if output_dic["VAV Reheat Damper Position"] < 0.9:
+                    output_dic["VAV Reheat Damper Position"] = 0.9
         return output_dic
     
     
