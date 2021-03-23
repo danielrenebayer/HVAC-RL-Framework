@@ -203,10 +203,10 @@ class CriticMergeAndOnlyFC:
             mtarget_param.data.copy_( (1-tau) * mtarget_param.data + tau * m_param.data)
 
     def save_models_to_disk(self, storage_dir, prefix=""):
-        torch.save(self.model, os.path.join(storage_dir, prefix + "critic_model.pickle"))
-        torch.save(self.model_target, os.path.join(storage_dir, prefix + "critic_model_target.pickle"))
+        torch.save(self.model, os.path.join(storage_dir, prefix + "_model.pickle"))
+        torch.save(self.model_target, os.path.join(storage_dir, prefix + "_model_target.pickle"))
 
     def load_models_from_disk(self, storage_dir, prefix=""):
-        self.model = torch.load(os.path.join(storage_dir, prefix + "critic_model.pickle"))
-        self.model_target= torch.load(os.path.join(storage_dir, prefix + "critic_model_target.pickle"))
+        self.model = torch.load(os.path.join(storage_dir, prefix + "_model.pickle"))
+        self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
 

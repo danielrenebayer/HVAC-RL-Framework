@@ -272,8 +272,10 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
         # save agent/critic networks every selected run
         if (n_episode+1) % args.network_storage_frequency == 0:
-            for agent in agents: agent.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
-            for critic in critics: critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_")
+            for idx, agent in enumerate(agents):
+                agent.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_agent_{idx}")
+            for idx, critic in enumerate(critics):
+                critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_critic_{idx}")
 
         # commit sql output if available
         if not sqloutput is None: sqloutput.db.commit()
