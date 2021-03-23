@@ -114,6 +114,7 @@ class AgentRL:
         self.ou_theta = 0.3 if args is None else args.ou_theta
         self.ou_mu    = 0.0 if args is None else args.ou_mu
         self.ou_sigma = 0.3 if args is None else args.ou_sigma
+        self.w_l2     = 0.00001 if args is None else args.agent_w_l2
 
         input_size  = len(self.input_parameters)
         output_size = len(self.controlled_parameters)
@@ -147,7 +148,7 @@ class AgentRL:
             mtarget_param.data.copy_(mactor_param.data)
 
         # initialize the optimizer
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr)
+        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
 
         # initialize the OU-Process
         self.ou_process = OrnsteinUhlenbeckProcess(theta = self.ou_theta,

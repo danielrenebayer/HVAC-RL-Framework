@@ -41,6 +41,7 @@ class CriticMergeAndOnlyFC:
         hidden_size      = 40 if args is None else args.critic_hidden_size
         self.hidden_size = hidden_size
         self.lr          = 0.001 if args is None else args.lr
+        self.w_l2        = 0.00001 if args is None else args.critic_w_l2
         self.use_cuda    = torch.cuda.is_available() if args is None else args.use_cuda
         if not args is None and args.critic_hidden_activation == "LeakyReLU":
             activation_fx     = torch.nn.LeakyReLU
@@ -75,7 +76,7 @@ class CriticMergeAndOnlyFC:
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(m_param.data)
         # init optimizer and loss
-        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = self.lr)
+        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = self.lr, weight_decay = self.w_l2)
         self.loss      = torch.nn.MSELoss()
         # define the transformation matrix
         trafo_list = []
