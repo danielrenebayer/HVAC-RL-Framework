@@ -241,6 +241,18 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
         critics.append(new_critic)
 
     #
+    # Load existing models if selected
+    if args.load_models_from_path != "":
+        load_episode = args.load_models_episode
+        load_path    = os.path.abspath(args.load_models_from_path)
+        for idx, agent in enumerate(agents):
+            agent.load_models_from_disk(load_path,  prefix=f"episode_{load_episode}_agent_{idx}")
+            print(f"Agent {idx} loaded from {load_path}")
+        for idx, critic in enumerate(critics):
+            critic.load_models_from_disk(load_path, prefix=f"episode_{load_episode}_critic_{idx}")
+            print(f"Critic {idx} loaded from {load_path}")
+
+    #
     # Set model parameters
     episode_len        = args.episode_length
     episode_start_day  = args.episode_start_day

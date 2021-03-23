@@ -30,6 +30,8 @@ def get_argparser():
     parser.add_argument('--checkpoint_dir', type=str, default="checkpoints/" + datetime.datetime.now().strftime("%Y%m%d-%H%M"))
     parser.add_argument('--model', type=str, default="5ZoneAirCooled", choices=["5ZoneAirCooled", "5ZoneAirCooled_SingleAgent"])
     parser.add_argument('--number_occupants', type=int, default=40)
+    parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")
+    parser.add_argument('--load_models_episode', type=int, default=0, help="The episode to load. If load_models_from_path is set to an empty string, it will be ignored.")
 
     return parser
 
