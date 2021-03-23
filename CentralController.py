@@ -14,7 +14,8 @@ import RLCritics
 
 def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         hyper_params = None, episode_number = 0, sqloutput = None,
-        extended_logging = False, evaluation_epoch = False):
+        extended_logging = False, evaluation_epoch = False,
+        add_ou_in_eval_epoch = False):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -74,9 +75,12 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         agent_actions_dict = {}
         agent_actions_list = []
         for agent in agents:
+            add_ou_process = True
+            if evaluation_epoch and not add_ou_in_eval_epoch:
+                add_ou_process = False
             new_action = agent.step_tensor(norm_state_ten,
                                            use_actor = True,
-                                           add_ou    = not evaluation_epoch)
+                                           add_ou    = add_ou_process)
             agent_actions_list.append( new_action )
             new_action_dict = agent.output_tensor_to_action_dict(new_action)
             agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
@@ -280,7 +284,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         n_episode,
                         sqloutput,
                         (n_episode+1) % args.network_storage_frequency == 0,
-                        (n_episode+1) % args.network_storage_frequency == 0)
+                        (n_episode+1) % args.network_storage_frequency == 0,
+                        args.add_ou_in_eval_epoch)
 
         # save agent/critic networks every selected run
         if (n_episode+1) % args.network_storage_frequency == 0:

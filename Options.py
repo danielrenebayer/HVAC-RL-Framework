@@ -16,6 +16,7 @@ def get_argparser():
     parser.add_argument('--lambda_rwd_mstpc', type=float, default=0.2)
     parser.add_argument('--lambda_rwd_energy', type=float, default=0.001)
     parser.add_argument('--use_cuda', action='store_true')
+    parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--ou_theta', type=float, default=0.3)
     parser.add_argument('--ou_mu', type=float, default=0.0)
     parser.add_argument('--ou_sigma', type=float, default=0.3)
