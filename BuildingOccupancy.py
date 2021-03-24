@@ -156,7 +156,7 @@ class WeeklyMeeting(Meeting):
     def get_all_dates(self):
         all_dates = []
         # find first day of the year, that ist the correct day of the week
-        first_day_in_year = datetime.date(2020,1,1)
+        first_day_in_year = datetime.date(2017,1,1)
         weekdays_diff = self.day_of_week - first_day_in_year.weekday()
         if weekdays_diff > 0:
             first_day_in_year = first_day_in_year + datetime.timedelta(days=weekdays_diff)
@@ -165,7 +165,7 @@ class WeeklyMeeting(Meeting):
         # iterate over all weeks
         for weekn in range(0, 53):
             curr_day = first_day_in_year + datetime.timedelta(weeks=weekn)
-            if curr_day.year > 2020:
+            if curr_day.year > 2017:
                 break
             all_dates.append((curr_day, self.time_start, self.time_end))
             #all_dates.append((datetime.datetime.combine(curr_day, self.time_start),
@@ -363,7 +363,7 @@ class BuildingOccupancy:
             te_h = np.random.randint(selected_ts_h[n] + 1,
                                      min(selected_ts_h[n] + 5, 20))
             te_m = np.random.randint(0, 60)
-            dayobj= datetime.date(2020,1,1) + datetime.timedelta(days=int(selected_day[n]))
+            dayobj= datetime.date(2017,1,1) + datetime.timedelta(days=int(selected_day[n]))
             ts   = datetime.time(selected_ts_h[n], selected_ts_m[n])
             te   = datetime.time(te_h, te_m)
             new_meeting = self.add_onetime_meeting(selected_room[n], dayobj, ts, te)

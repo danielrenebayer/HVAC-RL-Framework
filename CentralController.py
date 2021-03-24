@@ -40,10 +40,10 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
     #
     # prepare the simulation
     state = building.model.reset()
+    SU.fix_year_confussion(state)
     norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
     #
-    # TODO: get occupancy for the correct day (this is not important, because the occ at night is always 0)
-    current_occupancy = building_occ.draw_sample(datetime.datetime(2020, 1, 1, 0, 0))
+    current_occupancy = building_occ.draw_sample( state["time"] )
     timestep   = 0
     last_state = None
     # start the simulation loop
@@ -51,14 +51,9 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         actions = list()
         
         currdate = state['time']
-        currdate = datetime.datetime(year=2020, month=currdate.month, day=currdate.day, hour=currdate.hour,
-                                    minute=currdate.minute)
-        
         #
         # request occupancy for the next state
-        nextdate = state['time']
-        nextdate = datetime.datetime(year=2020, month=nextdate.month, day=nextdate.day, hour=nextdate.hour,
-                                    minute=nextdate.minute) + datetime.timedelta(minutes=5)
+        nextdate = state['time'] + datetime.timedelta(minutes=5)
         next_occupancy = building_occ.draw_sample(nextdate)
         #
         # propagate occupancy values to COBS / EnergyPlus
@@ -96,6 +91,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         timestep  += 1
         state      = building.model.step(actions)
         current_occupancy = next_occupancy
+        SU.fix_year_confussion(state)
 
         current_energy_Wh = state["energy"] / 360
 
@@ -231,7 +227,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     episode_len        = args.episode_length
     episode_start_day  = args.episode_start_day
     episode_start_month= args.episode_start_month
-    building.model.set_runperiod(episode_len, 2020, episode_start_month, episode_start_day)
+    building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
     building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
     #
     # Define the agents
@@ -245,9 +241,9 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     #
     # prepare the simulation
     state = building.model.reset()
+    SU.fix_year_confussion(state)
     #
-    # TODO: get occupancy for the correct day (this is not important, because the occ at night is always 0)
-    current_occupancy = building_occ.draw_sample(datetime.datetime(2020, 1, 1, 0, 0))
+    current_occupancy = building_occ.draw_sample( state["time"] )
     timestep   = 0
     last_state = None
     # start the simulation loop
@@ -255,14 +251,9 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         actions = list()
         
         currdate = state['time']
-        currdate = datetime.datetime(year=2020, month=currdate.month, day=currdate.day, hour=currdate.hour,
-                                    minute=currdate.minute)
-        
         #
         # request occupancy for the next state
-        nextdate = state['time']
-        nextdate = datetime.datetime(year=2020, month=nextdate.month, day=nextdate.day, hour=nextdate.hour,
-                                    minute=nextdate.minute) + datetime.timedelta(minutes=5)
+        nextdate = state['time'] + datetime.timedelta(minutes=5)
         next_occupancy = building_occ.draw_sample(nextdate)
         #
         # propagate occupancy values to COBS / EnergyPlus
@@ -290,6 +281,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         timestep  += 1
         state      = building.model.step(actions)
         current_occupancy = next_occupancy
+        SU.fix_year_confussion(state)
 
         current_energy_Wh = state["energy"] / 360
 
@@ -382,7 +374,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     episode_len        = args.episode_length
     episode_start_day  = args.episode_start_day
     episode_start_month= args.episode_start_month
-    building.model.set_runperiod(episode_len, 2020, episode_start_month, episode_start_day)
+    building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
     building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
 
     for n_episode in range(n_episodes):

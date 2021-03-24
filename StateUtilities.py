@@ -1,4 +1,5 @@
 
+import datetime
 from copy import deepcopy
 import torch
 
@@ -100,6 +101,21 @@ def unnormalized_state_to_tensor(state, building):
     """
     expand_state_timeinfo_temp(state, building)
     return normalized_state_to_tensor(normalize_variables_in_dict(state), building)
+
+
+def fix_year_confussion(state):
+    """
+    Because of an error in the EPlus-Python-interface (it passes the wrong year),
+    we have to manually set the year to 2017 (which is the default EPlus year).
+    """
+    orig_date_obj = state["time"]
+    new_date_obj  = datetime.datetime(
+                        year  = 2017,
+                        month = orig_date_obj.month,
+                        day   = orig_date_obj.day,
+                        hour  = orig_date_obj.hour,
+                        minute= orig_date_obj.minute)
+    state["time"] = new_date_obj
 
 
 def retrieve_substate_for_agent(normalized_state, agent, building):
