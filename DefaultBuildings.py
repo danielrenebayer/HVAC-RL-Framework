@@ -54,11 +54,17 @@ class Building_5ZoneAirCooled:
         self.eplus_var_types['Site Diffuse Solar Radiation Rate per Area'] = "Environment"
         self.eplus_var_types['Site Direct Solar Radiation Rate per Area']  = "Environment"
         #
+        # parse the file paths for IDF and EPW file
+        idf_file_path = os.path.join(global_paths["COBS"], "cobs/data/buildings/5ZoneAirCooled.idf")
+        epw_file_path = os.path.join(global_paths["COBS"], "cobs/data/weathers/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw")
+        if not args is None:
+            if args.idf_file != "": idf_file_path = os.path.abspath(args.idf_file)
+            if args.epw_file != "": epw_file_path = os.path.abspath(args.epw_file)
         #
         # define the model
         model = cobs.Model(
-            idf_file_name = os.path.join(global_paths["COBS"], "cobs/data/buildings/5ZoneAirCooled.idf"),
-            weather_file  = os.path.join(global_paths["COBS"], "cobs/data/weathers/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw"),
+            idf_file_name = idf_file_path,
+            weather_file  = epw_file_path,
             #weather_file  = os.path.join(global_paths["COBS"], "cobs/data/weathers/1.epw"),
             eplus_naming_dict = self.eplus_extra_states,
             eplus_var_types   = self.eplus_var_types,
