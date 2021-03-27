@@ -227,6 +227,7 @@ class AgentRL:
             ou_sample      = self.ou_process.sample()
             ou_sample      = ou_sample.astype(np.float32) # we need this line for torch 1.2.0, torch 1.8.0 does not need this any more
             output_tensor += torch.from_numpy(ou_sample[np.newaxis, :])
+            output_tensor  = torch.clamp(output_tensor, -1.0, 1.0)
         return output_tensor
 
     def output_tensor_to_action_dict(self, output_tensor):
