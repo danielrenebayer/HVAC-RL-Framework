@@ -102,11 +102,14 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
+        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
 
         #
         # reward computation
-        reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+        if not hyper_params is None and hyper_params.alternate_reward:
+            reward = - LAMBDA_REWARD_MANU_STP_CHANGES * alternate_reward_fn(state, building)
+        else:
+            reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -409,6 +412,31 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
         # commit sql output if available
         if not sqloutput is None: sqloutput.db.commit()
+
+
+
+
+
+def alternate_reward_fn(state, building):
+    changed_magnitude = 0
+    dto = state['time']
+    temp_values = state['temperature']
+    for room in building.room_names:
+        if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
+            # if the temperature is not in the range [21,23.5], change the setpoint
+            if temp_values[room] < 21.0:
+                changed_magnitude += 21.0 - temp_values[room]
+            elif temp_values[room] > 23.5:
+                changed_magnitude += temp_values[room] - 23.5
+        else:
+            # if the temperature is not in the range [15,17], change the setpoint
+            if temp_values[room] < 15:
+                changed_magnitude += 15 - temp_values[room]
+            elif temp_values[room] > 17:
+                changed_magnitude += temp_values[room] - 17
+    return changed_magnitude
+
+
 
 
 
