@@ -72,7 +72,10 @@ def main(args):
     # call the controlling function
     if args.use_rule_based_agent:
         # run one sample episode using the rule-based agent
-        one_baseline_episode(building, building_occ, args, sqloutput)
+        outputs = one_baseline_episode(building, building_occ, args, sqloutput)
+        f = open(os.path.join(args.checkpoint_dir, "complete_outputs.pickle"), "wb")
+        pickle.dump(outputs, f)
+        f.close()
     else:
         # run the model for n episodes
         run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput)

@@ -249,6 +249,12 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     current_occupancy = building_occ.draw_sample( state["time"] )
     timestep   = 0
     last_state = None
+    #
+    # lists for storing all states and all actions taken
+    episode_states_list  = []
+    episode_actions_list = []
+    episode_cobs_send_list = []
+    #
     # start the simulation loop
     while not building.model.is_terminate():
         actions = list()
@@ -277,6 +283,12 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         #
         # send agent actions to the building object and obtaion the actions for COBS/eplus
         actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
+
+        #
+        # save state and actions
+        episode_states_list.append(state)
+        episode_actions_list.append(agent_actions_dict)
+        episode_cobs_send_list.append(actions)
 
         #
         # send actions to EnergyPlus and obtian the new state
@@ -315,6 +327,8 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
 
     # commit sql output if available
     if not sqloutput is None: sqloutput.db.commit()
+
+    return episode_states_list, episode_actions_list, episode_cobs_send_list
 
 
 
