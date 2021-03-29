@@ -240,6 +240,12 @@ class AgentRL:
             output_dict[cp] = np_tensor[idx]
         return output_dict
 
+    def action_dict_to_output_tensor(self, action_dict):
+        output_tensor = np.zeros(len(self.controlled_parameters))
+        for idx, cp in enumerate(self.controlled_parameters):
+            output_tensor[idx] = action_dict[cp]
+        return torch.tensor(output_tensor[np.newaxis, :].astype(np.float32))
+
     def step(self, current_state, use_actor = True, add_ou = False):
         """
         Computes the next step. Outputs the resulting torch tensor and the tensor as converted dict.
