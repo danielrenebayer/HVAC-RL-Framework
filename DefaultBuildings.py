@@ -147,8 +147,8 @@ class Building_5ZoneAirCooled:
         actions = []
         for agent_name, ag_actions in agent_actions.items():
             controlled_group, _ = self.agent_device_pairing[agent_name]
-            if "VAV Reheat Damper Position" in ag_actions.keys():
-                action_val = ag_actions["VAV Reheat Damper Position"]
+            if "Zone VAV Reheat Damper Position" in ag_actions.keys():
+                action_val = ag_actions["Zone VAV Reheat Damper Position"]
                 actions.append({"priority": 0,
                                 "component_type": "Schedule:Constant",
                                 "control_type": "Schedule Value",
