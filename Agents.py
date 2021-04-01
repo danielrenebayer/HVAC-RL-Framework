@@ -126,16 +126,16 @@ class AgentRL:
         self.model_actor = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden_size),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.LeakyReLU(),
+            #torch.nn.Linear(hidden_size, hidden_size),
+            #torch.nn.LeakyReLU(),
             torch.nn.Linear(hidden_size, output_size),
             torch.nn.Tanh()
         )
         self.model_target = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden_size),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size, hidden_size),
-            torch.nn.LeakyReLU(),
+            #torch.nn.Linear(hidden_size, hidden_size),
+            #torch.nn.LeakyReLU(),
             torch.nn.Linear(hidden_size, output_size),
             torch.nn.Tanh()
         )
