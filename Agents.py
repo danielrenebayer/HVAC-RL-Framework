@@ -21,6 +21,7 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
+
     elif zone_class == "VAV with Reheat,Heating,Cooling,RL":
         new_agent = AgentRL(zone_class)
         new_agent.input_parameters = [
@@ -39,6 +40,7 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
+
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)
         new_agent.input_parameters = [
@@ -64,6 +66,32 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
                 f"{zone} Zone VAV Reheat Damper Position",
                 f"{zone} Zone Heating/Cooling-Mean Setpoint",
                 f"{zone} Zone Heating/Cooling-Delta Setpoint"])
+
+    elif zone_class == "5ZoneAirCooled,SingleAgent,RL,VerySmall":
+        new_agent = AgentRL(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week"]
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.input_parameters.extend([
+                f"{zone} Zone People Count"])
+        new_agent.controlled_parameters = []
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.controlled_parameters.extend([
+                f"{zone} Zone Heating/Cooling-Mean Setpoint",
+                f"{zone} Zone Heating/Cooling-Delta Setpoint"])
+
+    elif zone_class == "VAV with Reheat,Heating,Cooling,RL,VerySmall":
+        new_agent = AgentRL(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            #"Outdoor Air Temperature",
+            #'Outdoor Solar Radi Direct',
+            "Zone People Count"]
+        new_agent.controlled_parameters = [
+                "Zone Heating/Cooling-Mean Setpoint",
+                "Zone Heating/Cooling-Delta Setpoint"]
 
     else:
         raise AttributeError(f"Unknown zone class: {zone_class}")
