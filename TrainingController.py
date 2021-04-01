@@ -22,7 +22,7 @@ if not global_paths["COBS"] in sys.path: sys.path.append( global_paths["COBS"] )
 import cobs
 
 from BuildingOccupancy import BuildingOccupancy
-from DefaultBuildings import Building_5ZoneAirCooled_SingleAgent, Building_5ZoneAirCooled
+import DefaultBuildings
 from CentralController import run_for_n_episodes, one_baseline_episode
 from Options import get_argparser
 from SQLOutput import SQLOutput
@@ -38,9 +38,13 @@ def main(args):
     #
     # Define the building and the occupants
     if args.model == "5ZoneAirCooled_SingleAgent":
-        building = Building_5ZoneAirCooled_SingleAgent(args)
+        building = DefaultBuildings.Building_5ZoneAirCooled_SingleAgent(args)
+    elif args.model == "5ZoneAirCooled_SmallAgents":
+        building = DefaultBuildings.Building_5ZoneAirCooled_SmallAgents(args)
+    elif args.model == "5ZoneAirCooled_SmallSingleAgent":
+        building = DefaultBuildings.Building_5ZoneAirCooled_SmallSingleAgent(args)
     else:
-        building = Building_5ZoneAirCooled(args)
+        building = DefaultBuildings.Building_5ZoneAirCooled(args)
     building_occ = BuildingOccupancy()
     building_occ.set_room_settings(building.room_names[:-1], {building.room_names[-1]: 40}, 40)
     building_occ.generate_random_occupants(args.number_occupants)

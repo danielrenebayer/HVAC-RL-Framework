@@ -115,6 +115,9 @@ class AgentRL:
         self.ou_mu    = 0.0 if args is None else args.ou_mu
         self.ou_sigma = 0.3 if args is None else args.ou_sigma
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
+        self.ou_update_freq = 1 if args is None else args.ou_update_freq
+        self._stepts_since_last_ou_update = self.ou_update_freq
+        self._last_ou_sample = None
 
         input_size  = len(self.input_parameters)
         output_size = len(self.controlled_parameters)
@@ -224,8 +227,13 @@ class AgentRL:
         if self.use_cuda:
             output_tensor  = output_tensor.cpu()
         if add_ou:
-            ou_sample      = self.ou_process.sample()
-            ou_sample      = ou_sample.astype(np.float32) # we need this line for torch 1.2.0, torch 1.8.0 does not need this any more
+            if self._stepts_since_last_ou_update >= self.ou_update_freq:
+                self._stepts_since_last_ou_update = 1
+                ou_sample  = self.ou_process.sample()
+                self._last_ou_sample = ou_sample
+            else:
+                self._stepts_since_last_ou_update += 1
+            ou_sample      = self._last_ou_sample.astype(np.float32) # we need this line for torch 1.2.0, torch 1.8.0 does not need this any more
             output_tensor += torch.from_numpy(ou_sample[np.newaxis, :])
             output_tensor  = torch.clamp(output_tensor, -1.0, 1.0)
         return output_tensor

@@ -22,6 +22,7 @@ def get_argparser():
     parser.add_argument('--ou_theta', type=float, default=0.3)
     parser.add_argument('--ou_mu', type=float, default=0.0)
     parser.add_argument('--ou_sigma', type=float, default=0.3)
+    parser.add_argument('--ou_update_freq', type=int, default=1, help="Number of steps until obtaining the next sample from the OU-process")
     parser.add_argument('--episodes_count', type=int, default=100, help="Number of episodes to train on")
     parser.add_argument('--episode_length', type=int, default=30, help="The length of an episode in days")
     parser.add_argument('--episode_start_day', type=int, default=1)
