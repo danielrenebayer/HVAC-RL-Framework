@@ -40,7 +40,7 @@ class ReplayBufferStd:
         self._next_index = (self._next_index + 1) % self.max_size
 
 
-    def sample_minibatch(self, batch_size):
+    def sample_minibatch(self, batch_size, output_cat_agent_actions = True):
         """
         Draws a sample of minibatches.
         It ouputs a 5-tupel containing:
@@ -58,11 +58,17 @@ class ReplayBufferStd:
             b_state1.append( self._replay_list_state1[i] )
             b_state2.append( self._replay_list_state2[i] )
             b_actions.append(self._replay_list_actions[i])
-        return b_state1, \
-               b_actions,\
-               torch.cat([ torch.cat(a, dim=1) for a in b_actions ]).detach(), \
-               self._replay_ten_rewards[indexes, :], \
-               b_state2
+        if output_cat_agent_actions:
+            return b_state1, \
+                   b_actions,\
+                   torch.cat([ torch.cat(a, dim=1) for a in b_actions ]).detach(), \
+                   self._replay_ten_rewards[indexes, :], \
+                   b_state2
+        else:
+            return b_state1, \
+                   b_actions,\
+                   self._replay_ten_rewards[indexes, :], \
+                   b_state2
 
 
     def get_buffer_size(self):

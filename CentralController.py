@@ -203,6 +203,177 @@ def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
 
 
 
+def ddqn_episode_mc(building, building_occ, agents,
+        hyper_params = None, episode_number = 0, sqloutput = None,
+        extended_logging = False, evaluation_epoch = False,
+        add_epsilon_greedy_in_eval_epoch = False):
+    #
+    # define the hyper-parameters
+    if hyper_params is None:
+        LAMBDA_REWARD_ENERGY = 0.1
+        LAMBDA_REWARD_MANU_STP_CHANGES = 150
+        TAU_TARGET_NETWORKS = 0.01
+        DISCOUNT_FACTOR = 0.9
+        BATCH_SIZE = 128
+        RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
+        LEARNING_RATE = 0.01
+    else:
+        LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
+        LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
+        TAU_TARGET_NETWORKS  = hyper_params.tau
+        DISCOUNT_FACTOR = hyper_params.discount_factor
+        BATCH_SIZE      = hyper_params.batch_size
+        RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
+        LEARNING_RATE   = hyper_params.lr
+    #
+    # Define the replay ReplayBuffer
+    rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
+    #
+    # Define the loss
+    loss = torch.nn.MSELoss()
+    #
+    # prepare the simulation
+    state = building.model.reset()
+    SU.fix_year_confussion(state)
+    norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
+    #
+    current_occupancy = building_occ.draw_sample( state["time"] )
+    timestep   = 0
+    last_state = None
+    # start the simulation loop
+    while not building.model.is_terminate():
+        actions = list()
+
+        currdate = state['time']
+        #
+        # request occupancy for the next state
+        nextdate = state['time'] + datetime.timedelta(minutes=5)
+        next_occupancy = building_occ.draw_sample(nextdate)
+        #
+        # propagate occupancy values to COBS / EnergyPlus
+        for zonename, occd in next_occupancy.items():
+            actions.append({"priority":        0,
+                            "component_type": "Schedule:Constant",
+                            "control_type":   "Schedule Value",
+                            "actuator_key":  f"OCC-SCHEDULE-{zonename}",
+                            "value":           next_occupancy[zonename]["relative number occupants"],
+                            "start_time":      state['timestep'] + 1})
+
+        #
+        # request new actions from all agents
+        agent_actions_dict = {}
+        agent_actions_list = []
+        for agent in agents:
+            add_random_process = True
+            if evaluation_epoch and not add_epsilon_greedy_in_eval_epoch:
+                add_random_process = False
+            new_action = agent.next_action(norm_state_ten, add_random_process)
+            agent_actions_list.append( new_action )
+            agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
+            # no backtransformation of variables needed, this is done in agents definition already
+
+        #
+        # send agent actions to the building object and obtaion the actions for COBS/eplus
+        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
+
+        #
+        # send actions to EnergyPlus and obtian the new state
+        norm_state_ten_last = norm_state_ten
+        last_state = state
+        timestep  += 1
+        state      = building.model.step(actions)
+        current_occupancy = next_occupancy
+        SU.fix_year_confussion(state)
+
+        current_energy_Wh = state["energy"] / 360
+
+        #
+        # modify state
+        norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
+
+        #
+        # send current temp/humidity values for all rooms
+        # obtain number of manual setpoint changes
+        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+
+        #
+        # reward computation
+        if not hyper_params is None and hyper_params.alternate_reward:
+            reward = - LAMBDA_REWARD_MANU_STP_CHANGES * alternate_reward_fn(state, building)
+        else:
+            reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+
+        #
+        # save (last_state, actions, reward, state) to replay buffer
+        rpb.add_transition(norm_state_ten_last, agent_actions_list, reward, norm_state_ten)
+
+        #
+        # sample minibatch
+        b_state1, b_action, b_reward, b_state2 = rpb.sample_minibatch(BATCH_SIZE, False)
+        b_action = torch.tensor(b_action)
+
+        #
+        # loop over all [agent, critic]-pairs
+        output_loss_list = []
+        output_q_st2_list= [0 for _ in agents]
+        output_J_mean_list=[0 for _ in agents]
+        output_cr_frobnorm_mat_list = [0 for _ in agents]
+        output_cr_frobnorm_bia_list = [0 for _ in agents]
+        output_ag_frobnorm_mat_list = []
+        output_ag_frobnorm_bia_list = []
+        for agent_id, agent in enumerate(agents):
+            #
+            # compute y (i.e. the TD-target)
+            #  Hint: s_{i+1} <- state2; s_i <- state1
+            agent.model_actor.zero_grad()
+            y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+            # compute Q for state1
+            q = agent.step_tensor(b_state1, use_actor = True).gather(1, b_action[:, agent_id][:, np.newaxis])
+            #print("S Shape", q.shape, "Y SHAPE", y.shape)
+            assert q.shape == y.shape, "Shape missmatch."
+            # update agent by minimizing the loss L
+            L = loss(q, y)
+            L.backward()
+            agent.optimizer_step()
+            #
+            # save outputs
+            output_loss_list.append(float(L.detach().numpy()))
+            # compute and store frobenius norms for the weights
+            ag_fnorm1, ag_fnorm2 = 0, 0
+            for p in agent.model_actor.parameters():
+                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
+
+
+        if not evaluation_epoch:
+            #
+            # update target network for actors
+            for agent in agents:
+                agent.copy_weights_to_target()
+
+        #
+        # store losses in the loss list
+        if not sqloutput is None:
+            sqloutput.add_every_step_of_episode( locals() )
+
+        #
+        # store detailed output, if extended logging is selected
+        if extended_logging and not sqloutput is None:
+            sqloutput.add_every_step_of_some_episodes( locals() )
+
+        if timestep % 20 == 0:
+            print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
+
+    #
+    # elements, that should be stored only once per episode
+    if not sqloutput is None:
+        sqloutput.add_last_step_of_episode( locals() )
+
+
+
+
 
 def one_baseline_episode(building, building_occ, args, sqloutput = None):
     hyper_params = args
@@ -357,22 +528,23 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
     #
     # Define the critics
-    critics = []
-    ciritic_input_variables=["Minutes of Day","Day of Week","Calendar Week",
-                             "Outdoor Air Temperature","Outdoor Air Humidity",
-                             "Outdoor Wind Speed","Outdoor Wind Direction",
-                             "Outdoor Solar Radi Diffuse","Outdoor Solar Radi Direct"]
-    for vartype in ["Zone Temperature","Zone People Count",
-                    "Zone Relative Humidity",
-                    "Zone VAV Reheat Damper Position","Zone CO2"]:
-        ciritic_input_variables.extend( [f"SPACE{k}-1 {vartype}" for k in range(1,6)] )
-    for agent in agents:
-        new_critic = RLCritics.CriticMergeAndOnlyFC(
+    if args.algorithm == "ddpg":
+        critics = []
+        ciritic_input_variables=["Minutes of Day","Day of Week","Calendar Week",
+                                 "Outdoor Air Temperature","Outdoor Air Humidity",
+                                 "Outdoor Wind Speed","Outdoor Wind Direction",
+                                 "Outdoor Solar Radi Diffuse","Outdoor Solar Radi Direct"]
+        for vartype in ["Zone Temperature","Zone People Count",
+                        "Zone Relative Humidity",
+                        "Zone VAV Reheat Damper Position","Zone CO2"]:
+            ciritic_input_variables.extend( [f"SPACE{k}-1 {vartype}" for k in range(1,6)] )
+        for agent in agents:
+            new_critic = RLCritics.CriticMergeAndOnlyFC(
                     args = args,
                     input_variables=ciritic_input_variables,
                     agents = agents,
                     global_state_keys=building.global_state_variables)
-        critics.append(new_critic)
+            critics.append(new_critic)
 
     #
     # Load existing models if selected
@@ -382,9 +554,10 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
         for idx, agent in enumerate(agents):
             agent.load_models_from_disk(load_path,  prefix=f"episode_{load_episode}_agent_{idx}")
             print(f"Agent {idx} loaded from {load_path}")
-        for idx, critic in enumerate(critics):
-            critic.load_models_from_disk(load_path, prefix=f"episode_{load_episode}_critic_{idx}")
-            print(f"Critic {idx} loaded from {load_path}")
+        if args.algorithm == "ddpg":
+            for idx, critic in enumerate(critics):
+                critic.load_models_from_disk(load_path, prefix=f"episode_{load_episode}_critic_{idx}")
+                print(f"Critic {idx} loaded from {load_path}")
 
     #
     # Set model parameters
@@ -404,12 +577,25 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
             "vav_pos_list": []
         }
-    
-        ddpg_episode_mc(building,
+
+        if args.algorithm == "ddpg":
+            ddpg_episode_mc(
+                        building,
                         building_occ,
                         agents,
                         critics,
                         output_lists,
+                        args,
+                        n_episode,
+                        sqloutput,
+                        (n_episode+1) % args.network_storage_frequency == 0,
+                        (n_episode+1) % args.network_storage_frequency == 0,
+                        args.add_ou_in_eval_epoch)
+        elif args.algorithm == "ddqn":
+            ddqn_episode_mc(
+                        building,
+                        building_occ,
+                        agents,
                         args,
                         n_episode,
                         sqloutput,
@@ -421,8 +607,9 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
         if (n_episode+1) % args.network_storage_frequency == 0:
             for idx, agent in enumerate(agents):
                 agent.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_agent_{idx}")
-            for idx, critic in enumerate(critics):
-                critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_critic_{idx}")
+            if args.algorithm == "ddpg":
+                for idx, critic in enumerate(critics):
+                    critic.save_models_to_disk(args.checkpoint_dir, prefix=f"episode_{n_episode}_critic_{idx}")
 
         # commit sql output if available
         if not sqloutput is None: sqloutput.db.commit()

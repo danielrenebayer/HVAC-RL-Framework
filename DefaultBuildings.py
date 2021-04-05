@@ -13,8 +13,13 @@ class Building_5ZoneAirCooled:
         self.room_names = [f'SPACE{i}-1' for i in range(1,6)]
         #
         # the pairing which gives, which agent (identified by name) controlles which device (or zone) and what kind of device it is
-        self.agent_device_pairing = {f"Agent SPACE{i}-1":
+        if args.algorithm == "ddpg":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
                                          (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,RL")
+                                     for i in range(1,6)}
+        elif args.algorithm == "ddqn":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                         (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,Q,RL")
                                      for i in range(1,6)}
         #
         # A dictionary formatted as {target sensor: state name (as named in the output state dict)}
@@ -182,8 +187,13 @@ class Building_5ZoneAirCooled_SmallAgents(Building_5ZoneAirCooled):
         #
         super().__init__(args)
         #
-        self.agent_device_pairing = {f"Agent SPACE{i}-1":
+        if args.algorithm == "ddpg":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
                                          (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,RL,VerySmall")
+                                     for i in range(1,6)}
+        elif args.algorithm == "ddqn":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                         (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,Q,RL,VerySmall")
                                      for i in range(1,6)}
 
     def obtain_cobs_actions(self, agent_actions, next_timestep):
