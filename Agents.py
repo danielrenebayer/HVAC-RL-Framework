@@ -2,6 +2,7 @@
 import os
 import torch
 import numpy as np
+import itertools
 
 from RandomProcessExt import OrnsteinUhlenbeckProcess
 
@@ -40,6 +41,38 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
+
+    elif zone_class == "VAV with Reheat,Heating,Cooling,Q,RL":
+        new_agent = QNetwork(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Calendar Week",
+            "Outdoor Air Temperature",
+            "Outdoor Air Humidity",
+            "Outdoor Wind Speed",
+            'Outdoor Wind Direction',
+            'Outdoor Solar Radi Diffuse',
+            'Outdoor Solar Radi Direct',
+            "Zone Relative Humidity",
+            "Zone VAV Reheat Damper Position",
+            "Zone CO2",
+            "Zone People Count",
+            "Zone Temperature"]
+        new_agent.controlled_parameters = {
+            "Zone VAV Reheat Damper Position": (0.1, 1.0, 3),
+            "Zone Heating/Cooling-Mean Setpoint": (18.0, 23.0, 6),
+            "Zone Heating/Cooling-Delta Setpoint": (2.0, 8.0, 3)}
+
+    elif zone_class == "VAV with Reheat,Heating,Cooling,Q,RL,VerySmall":
+        new_agent = QNetwork(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Zone People Count"]
+        new_agent.controlled_parameters = {
+            "Zone Heating/Cooling-Mean Setpoint": (18.0, 23.0, 6),
+            "Zone Heating/Cooling-Delta Setpoint": (2.0, 8.0, 3)}
 
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)
@@ -323,6 +356,193 @@ class AgentRL:
     def load_models_from_disk(self, storage_dir, prefix=""):
         self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+
+
+
+
+
+class QNetwork:
+    """
+    This class represents a Q-network as required for DQN.
+    """
+
+    def __init__(self, class_name):
+        self.class_name = class_name
+        self.input_parameters = []
+        self.controlled_parameters = {} # {"param name": (min, max, num_discr_steps)}
+        self.model_actor = None
+        self.model_target= None
+        self.trafo_matrix= None
+        self.initialized = False
+        self.name = ""
+        self.controlled_element = ""
+        self.optimizer = None
+
+    def initialize(self, name, controlled_element, global_state_keys, args = None):
+        """
+        Initializes the agent.
+        This function should be callen after the creation of the object and the
+        corret set of the input / output variables.
+
+        Parameters
+        ----------
+        name : str
+            The name of the agent.
+        controlled_element : str
+            The name of the element (as uniquly named in the building), that is controlled.
+        global_state_keys : list of str
+            The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
+        args : argparse
+            Additional arguments, optional.
+        """
+        if len(self.input_parameters) == 0 or len(self.controlled_parameters.keys()) == 0:
+            raise RuntimeError("The number of input and output parameters has to be greater than 0")
+        self.initialized = True
+        self.name = name
+        self.controlled_element = controlled_element
+        self.use_cuda = torch.cuda.is_available() if args is None else args.use_cuda
+        self.lr     = 0.001 if args is None else args.lr
+        self.epsilon  = 0.05 if args is None else args.epsilon
+        self.w_l2     = 0.00001 if args is None else args.agent_w_l2
+
+        # In the end, an index of the output tensor represents an action.
+        # We create this mapping here.
+        self.output_to_action_mapping = []
+        ubg_extended_action_list      = []
+        for action_name, (val_min, val_max, val_discr_level) in self.controlled_parameters.items():
+            ubg_list = []
+            for val_step in np.linspace(val_min, val_max, val_discr_level):
+                ubg_list.append( (action_name, val_step) )
+            ubg_extended_action_list.append( ubg_list )
+        # compute cross product for all possible action steps
+        self.output_to_action_mapping = list( itertools.product(*ubg_extended_action_list) )
+
+        self.output_size = len(self.output_to_action_mapping)
+        input_size   = len(self.input_parameters)
+        hidden_size1 = (2*input_size+  self.output_size) // 3
+        hidden_size2 = (  input_size+2*self.output_size) // 3
+
+        self.model_actor = torch.nn.Sequential(
+            torch.nn.Linear(input_size, hidden_size1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size1, hidden_size2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size2, self.output_size)
+        )
+        self.model_target = torch.nn.Sequential(
+            torch.nn.Linear(input_size, hidden_size1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size1, hidden_size2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(hidden_size2, self.output_size)
+        )
+        # change initialization
+        for m_param in self.model_actor.parameters():
+            if len(m_param.shape) == 1:
+                # other initialization for biases
+                torch.nn.init.constant_(m_param, 0.001)
+            else:
+                torch.nn.init.normal_(m_param, 0.0, 1.0)
+        # copy weights from actor -> target
+        self.copy_weights_to_target()
+
+        # initialize the optimizer
+        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+
+        # define the transformation matrix
+        trafo_list = []
+        for input_param in self.input_parameters:
+            try:
+                idx = global_state_keys.index(input_param) # this may rise a ValueError
+            except ValueError:
+                # if a ValueError occurs, the element is not in the list
+                # this means, that we have to add the name of the controlled device
+                # in front of the input parameter to find the element
+                idx = global_state_keys.index(f"{self.controlled_element} {input_param}")
+            row = torch.zeros(len(global_state_keys))
+            row[idx] = 1.0
+            trafo_list.append(row)
+        self.trafo_matrix = torch.stack(trafo_list).T
+
+        # Move things to GPU, if selected
+        if self.use_cuda:
+            self.model_actor = self.model_actor.to(0)
+            self.model_target= self.model_target.to(0)
+            self.trafo_matrix = self.trafo_matrix.to(0)
+
+    def optimizer_step(self):
+        """
+        Applies on step by the optimizer.
+        """
+        self.optimizer.step()
+
+    def copy_weights_to_target(self):
+        """
+        copy weights from the actor network to the target network.
+        """
+        for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
+            mtarget_param.data.copy_(mactor_param.data)
+
+    def step_tensor(self, state_tensor, use_actor = True):
+        """
+        Computes the next step and outputs the resulting torch tensor.
+
+        Parameters
+        ---------
+        state_tensor : torch.tensor
+            The global state tensor.
+        use_actor : Boolean
+            If set to true, it will use the actor model for infering the next state, otherwise
+            it will use the target network.
+            Defaults to True.
+        """
+        if type(state_tensor) == list:
+            state_tensor = torch.cat(state_tensor, dim=0)
+        if self.use_cuda:
+            state_tensor = state_tensor.to(0)
+        input_tensor = torch.matmul(state_tensor, self.trafo_matrix)
+        if use_actor:
+            output_tensor  = self.model_actor(input_tensor)
+        else:
+            output_tensor  = self.model_target(input_tensor)
+        if self.use_cuda:
+            output_tensor  = output_tensor.cpu()
+        return output_tensor
+
+    def next_action(self, state, use_random_action_selection = False):
+        """
+        Computes the next action to take.
+
+        Parameters
+        ---------
+        use_random_action_selection : Boolean
+            If set to true, it will return (with a probability of self.epsilon) a random action.
+            Defaults to False.
+        """
+        if np.random.rand() <= self.epsilon:
+            # return random action
+            return np.random.randint(0, self.output_size)
+
+        return int(self.step_tensor(state, use_actor = True).detach()[0].argmax().numpy())
+
+    def output_action_to_action_dict(self, position : int):
+        """
+        Returns the selected action for a given argmax-position of the output tensor.
+        """
+        action_lst  = self.output_to_action_mapping[ position ]
+        output_dict = {}
+        for c_name, c_val in action_lst:
+            output_dict[c_name] = c_val
+        return output_dict
+
+    def save_models_to_disk(self, storage_dir, prefix=""):
+        torch.save(self.model_actor,  os.path.join(storage_dir, prefix + "_model_actor.pickle"))
+        torch.save(self.model_target, os.path.join(storage_dir, prefix + "_model_target.pickle"))
+
+    def load_models_from_disk(self, storage_dir, prefix=""):
+        self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
+        self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+
 
 
 
