@@ -12,7 +12,7 @@ import StateUtilities as SU
 from Agents import agent_constructor
 import RLCritics
 
-def ddpg_episode_mc(building, building_occ, agents, critics, output_lists,
+def ddpg_episode_mc(building, building_occ, agents, critics,
         hyper_params = None, episode_number = 0, sqloutput = None,
         extended_logging = False, evaluation_epoch = False,
         add_ou_in_eval_epoch = False):
@@ -568,15 +568,6 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
 
     for n_episode in range(n_episodes):
-        output_lists = {
-
-            "room_temp_list": [],
-            "occupancy_list": [],
-            "humidity_list": [],
-            "co2_ppm_list": [],
-
-            "vav_pos_list": []
-        }
 
         if args.algorithm == "ddpg":
             ddpg_episode_mc(
@@ -584,7 +575,6 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         building_occ,
                         agents,
                         critics,
-                        output_lists,
                         args,
                         n_episode,
                         sqloutput,
