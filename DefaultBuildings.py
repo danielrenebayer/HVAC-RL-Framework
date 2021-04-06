@@ -21,6 +21,10 @@ class Building_5ZoneAirCooled:
             self.agent_device_pairing = {f"Agent SPACE{i}-1":
                                          (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,Q,RL")
                                      for i in range(1,6)}
+        elif args.algorithm == "rule-based":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                         (f"SPACE{i}-1", "VAV with Reheat,Heating,Cooling,NoRL")
+                                     for i in range(1,6)}
         #
         # A dictionary formatted as {target sensor: state name (as named in the output state dict)}
         # Target sensor is a tuple: (variable name, key value)

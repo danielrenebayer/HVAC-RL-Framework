@@ -74,7 +74,7 @@ def main(args):
 
     #
     # call the controlling function
-    if args.use_rule_based_agent:
+    if args.algorithm == "rule-based":
         # run one sample episode using the rule-based agent
         outputs = one_baseline_episode(building, building_occ, args, sqloutput)
         f = open(os.path.join(args.checkpoint_dir, "complete_outputs.pickle"), "wb")

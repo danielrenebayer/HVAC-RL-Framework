@@ -8,7 +8,7 @@ def get_argparser():
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algorithm', type=str, default="ddpg", choices=["ddpg", "ddqn"])
+    parser.add_argument('--algorithm', type=str, default="ddpg", choices=["ddpg", "ddqn", "rule-based"], help="If 'rule-based' is selected, it will perform a evaluation for one episode only, instead of a complete training with a RL agent and critics.")
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--tau', type=float, default=0.01)
     parser.add_argument('--discount_factor', type=float, default=0.9)
@@ -17,7 +17,6 @@ def get_argparser():
     parser.add_argument('--lambda_rwd_mstpc', type=float, default=0.2)
     parser.add_argument('--lambda_rwd_energy', type=float, default=0.001)
     parser.add_argument('--alternate_reward',     action='store_true', help="Alternate reward: ignore energy and manual setpoint changes, use rulebased reward instead.")
-    parser.add_argument('--use_rule_based_agent', action='store_true', help="Use the rule based agent and perform only a evaluation for one episode, instead of a complete training with a RL agent and critics.")
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--ou_theta', type=float, default=0.3)
@@ -42,6 +41,10 @@ def get_argparser():
     parser.add_argument('--load_models_episode', type=int, default=0, help="The episode to load. If load_models_from_path is set to an empty string, it will be ignored.")
     parser.add_argument('--idf_file', type=str, default="", help="Path to the EPlus IDF file.")
     parser.add_argument('--epw_file', type=str, default="", help="Path to the EPlus weather file.")
+    parser.add_argument('--rulebased_setpoint_unoccu_mean',  type=float, default=23.0)
+    parser.add_argument('--rulebased_setpoint_unoccu_delta', type=float, default= 7.0)
+    parser.add_argument('--rulebased_setpoint_occu_mean',    type=float, default=21.5)
+    parser.add_argument('--rulebased_setpoint_occu_delta',   type=float, default= 1.0)
 
     return parser
 

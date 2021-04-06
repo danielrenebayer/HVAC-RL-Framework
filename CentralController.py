@@ -407,10 +407,11 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     # Define the agents
     agents = []
     for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
-        new_agent = agent_constructor( controlled_device_type[:-2] + "NoRL" )
+        new_agent = agent_constructor( controlled_device_type )
         new_agent.initialize(
                          name = agent_name,
-                         controlled_element = controlled_device)
+                         controlled_element = controlled_device,
+                         args = args)
         agents.append(new_agent)
     #
     # prepare the simulation
