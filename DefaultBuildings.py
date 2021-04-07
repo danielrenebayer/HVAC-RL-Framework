@@ -239,6 +239,100 @@ class Building_5ZoneAirCooled_SmallAgents(Building_5ZoneAirCooled):
             #    print(f"Action {action_name} from agent in zone {zone} unknown.")
         return actions
 
+class Building_5ZoneAirCooled_SingleSetpoint_SmallAgents(Building_5ZoneAirCooled):
+    def __init__(self, args = None):
+        #
+        super().__init__(args)
+        #
+        if args.algorithm == "ddqn":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                         (f"SPACE{i}-1", "SingleSetpoint,Q,RL,VerySmall")
+                                     for i in range(1,6)}
+        else:
+            raise AttributeError(f"{args.algorithm} is not available for the class Building_5ZoneAirCooled_SingleSetpoint_SmallAgents")
+
+    def obtain_cobs_actions(self, agent_actions, next_timestep):
+        """
+        Returns a list of actions that can be passed to cobs.
+
+        The agent_actions dict is expected to have the format:
+        {agent_name: {controlled_parameter: new_value}}
+        """
+        actions = []
+        for agent_name, ag_actions in agent_actions.items():
+            controlled_group, _ = self.agent_device_pairing[agent_name]
+            #
+            # set VAV constantly to 1
+            actions.append({"priority": 0,
+                            "component_type": "Schedule:Constant",
+                            "control_type": "Schedule Value",
+                            "actuator_key": f"{controlled_group} VAV Customized Schedule",
+                            "value": 1,
+                            "start_time": next_timestep})
+            #
+            heating_temp   = ag_actions["Zone Heating Setpoint"]
+            cooling_offset = 12
+            actions.append({"value":      heating_temp,
+                            "start_time": next_timestep,
+                            "priority":   0,
+                            "component_type": "Zone Temperature Control",
+                            "control_type":   "Heating Setpoint",
+                            "actuator_key":   controlled_group})
+            actions.append({"value":      heating_temp + cooling_offset,
+                            "start_time": next_timestep,
+                            "priority":   0,
+                            "component_type": "Zone Temperature Control",
+                            "control_type":   "Cooling Setpoint",
+                            "actuator_key":   controlled_group})
+        return actions
+
+class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
+    def __init__(self, args = None):
+        #
+        super().__init__(args)
+        #
+        if args.algorithm == "ddqn":
+            self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                         (f"SPACE{i}-1", "SingleSetpoint,Q,RL")
+                                     for i in range(1,6)}
+        else:
+            raise AttributeError(f"{args.algorithm} is not available for the class Building_5ZoneAirCooled_SingleSetpoint")
+
+    def obtain_cobs_actions(self, agent_actions, next_timestep):
+        """
+        Returns a list of actions that can be passed to cobs.
+
+        The agent_actions dict is expected to have the format:
+        {agent_name: {controlled_parameter: new_value}}
+        """
+        actions = []
+        for agent_name, ag_actions in agent_actions.items():
+            controlled_group, _ = self.agent_device_pairing[agent_name]
+            #
+            # set VAV constantly to 1
+            actions.append({"priority": 0,
+                            "component_type": "Schedule:Constant",
+                            "control_type": "Schedule Value",
+                            "actuator_key": f"{controlled_group} VAV Customized Schedule",
+                            "value": 1,
+                            "start_time": next_timestep})
+            #
+            heating_temp   = ag_actions["Zone Heating Setpoint"]
+            cooling_offset = 12
+            actions.append({"value":      heating_temp,
+                            "start_time": next_timestep,
+                            "priority":   0,
+                            "component_type": "Zone Temperature Control",
+                            "control_type":   "Heating Setpoint",
+                            "actuator_key":   controlled_group})
+            actions.append({"value":      heating_temp + cooling_offset,
+                            "start_time": next_timestep,
+                            "priority":   0,
+                            "component_type": "Zone Temperature Control",
+                            "control_type":   "Cooling Setpoint",
+                            "actuator_key":   controlled_group})
+        return actions
+
 class Building_5ZoneAirCooled_SingleAgent(Building_5ZoneAirCooled):
     def __init__(self, args = None):
         #

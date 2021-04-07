@@ -74,6 +74,35 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone Heating/Cooling-Mean Setpoint": (18.0, 23.0, 6),
             "Zone Heating/Cooling-Delta Setpoint": (2.0, 8.0, 3)}
 
+    elif zone_class == "SingleSetpoint,Q,RL,VerySmall":
+        new_agent = QNetwork(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Zone People Count"]
+        new_agent.controlled_parameters = {
+            "Zone Heating Setpoint": (14.0, 23.0, 10)}
+
+    elif zone_class == "SingleSetpoint,Q,RL":
+        new_agent = QNetwork(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Calendar Week",
+            "Outdoor Air Temperature",
+            "Outdoor Air Humidity",
+            "Outdoor Wind Speed",
+            'Outdoor Wind Direction',
+            'Outdoor Solar Radi Diffuse',
+            'Outdoor Solar Radi Direct',
+            "Zone Relative Humidity",
+            "Zone VAV Reheat Damper Position",
+            "Zone CO2",
+            "Zone People Count",
+            "Zone Temperature"]
+        new_agent.controlled_parameters = {
+            "Zone Heating Setpoint": (14.0, 23.0, 10)}
+
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)
         new_agent.input_parameters = [
