@@ -33,7 +33,11 @@ def main(args):
 
     parser = get_argparser()
     args   = parser.parse_args()
+    if args.continue_training and not os.path.exists(os.path.join(args.checkpoint_dir, "status.pickle")):
+        args.continue_training = False
     os.makedirs(args.checkpoint_dir, exist_ok=True)
+    episode_offset = 0
+    status_dict    = {}
 
     #
     # Define the building and the occupants
@@ -45,16 +49,36 @@ def main(args):
         building = DefaultBuildings.Building_5ZoneAirCooled_SmallSingleAgent(args)
     else:
         building = DefaultBuildings.Building_5ZoneAirCooled(args)
-    building_occ = BuildingOccupancy()
-    building_occ.set_room_settings(building.room_names[:-1], {building.room_names[-1]: 40}, 40)
-    building_occ.generate_random_occupants(args.number_occupants)
-    building_occ.generate_random_meetings(15,0)
 
-    #
-    # save the building_occ object
-    f = open(os.path.join(args.checkpoint_dir, "building_occ.pickle"), "wb")
-    pickle.dump(building_occ, f)
-    f.close()
+    sqloutput = SQLOutput(os.path.join(args.checkpoint_dir, "ouputs.sqlite"), building)
+    if not args.continue_training:
+        sqloutput.initialize()
+    else:
+        f = open(os.path.join(args.checkpoint_dir, "status.pickle"), "rb")
+        status_dict = pickle.load(f)
+        f.close()
+
+    if args.continue_training:
+        # load the building_occ object
+        f = open(os.path.join(args.checkpoint_dir, "building_occ.pickle"), "rb")
+        building_occ = pickle.load(f)
+        f.close()
+        # set episode_offset
+        episode_offset = status_dict["next_episode_offset"]
+        # define the latest model paths
+        args.load_models_from_path = args.checkpoint_dir
+        args.load_models_episode   = episode_offset - 1
+    else:
+        # initialize a new building object
+        building_occ = BuildingOccupancy()
+        building_occ.set_room_settings(building.room_names[:-1], {building.room_names[-1]: 40}, 40)
+        building_occ.generate_random_occupants(args.number_occupants)
+        building_occ.generate_random_meetings(15,0)
+        #
+        # save the building_occ object
+        f = open(os.path.join(args.checkpoint_dir, "building_occ.pickle"), "wb")
+        pickle.dump(building_occ, f)
+        f.close()
 
     #
     # save the arguments as text
@@ -65,12 +89,10 @@ def main(args):
             arguments_text += f"{arg:30} {arg_val:20} [Default: {arg_def}]\n"
         else:
             arguments_text += f"{arg:30} {arg_val:20}\n"
-    f = open(os.path.join(args.checkpoint_dir, "options.txt"), "w")
+    options_filename = "options.txt" if not args.continue_training else f"options_episode_offset_{episode_offset}.txt"
+    f = open(os.path.join(args.checkpoint_dir, options_filename), "w")
     f.write(arguments_text)
     f.close()
-
-    sqloutput = SQLOutput(os.path.join(args.checkpoint_dir, "ouputs.sqlite"), building)
-    sqloutput.initialize()
 
     #
     # call the controlling function
@@ -82,10 +104,16 @@ def main(args):
         f.close()
     else:
         # run the model for n episodes
-        run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput)
+        run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput, episode_offset)
 
     sqloutput.db.commit()
     sqloutput.db.close()
+
+    # write the status object
+    status_dict["next_episode_offset"] = args.episodes_count + episode_offset
+    f = open(os.path.join(args.checkpoint_dir, "status.pickle"), "wb")
+    pickle.dump(f, status_dict)
+    f.close()
 
 
 

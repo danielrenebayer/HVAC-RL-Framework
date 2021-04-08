@@ -507,7 +507,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
 
 
 
-def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None):
+def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None, episode_offset = 0):
     """
     Runs the ddpg algorithm (i.e. the above defined ddpg_episode_mc function)
     for n_episodes runs.
@@ -568,7 +568,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
     building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
 
-    for n_episode in range(n_episodes):
+    for n_episode in range(episode_offset, n_episodes + episode_offset):
 
         if args.algorithm == "ddpg":
             ddpg_episode_mc(
