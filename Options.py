@@ -42,6 +42,7 @@ def get_argparser():
     parser.add_argument('--model', type=str, default="5ZoneAirCooled", choices=[
         "5ZoneAirCooled", "5ZoneAirCooled_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint", "Building_5ZoneAirCooled_SingleSetpoint_SmallAgents",
+        "Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent",
         "5ZoneAirCooled_SingleAgent", "5ZoneAirCooled_SmallSingleAgent"])
     parser.add_argument('--number_occupants', type=int, default=40)
     parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")

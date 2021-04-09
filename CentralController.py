@@ -654,7 +654,10 @@ def reward_fn_rulebased_agent_output(state, agent_actions_dict):
     changed_magnitude = 0
     dto = state['time']
     for agent, agent_actions in agent_actions_dict.items():
-        agent_heating_setpoint = agent_actions["Zone Heating/Cooling-Mean Setpoint"] - agent_actions["Zone Heating/Cooling-Delta Setpoint"]
+        if "Zone Heating/Cooling-Mean Setpoint" in agent_actions.keys():
+            agent_heating_setpoint = agent_actions["Zone Heating/Cooling-Mean Setpoint"] - agent_actions["Zone Heating/Cooling-Delta Setpoint"]
+        else:
+            agent_heating_setpoint = agent_actions["Zone Heating Setpoint"]
         if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
             # if the temperature is not in the range [21,23.5], change the setpoint
             if agent_heating_setpoint < 21.0:
