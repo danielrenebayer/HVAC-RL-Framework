@@ -356,13 +356,6 @@ def ddqn_episode_mc(building, building_occ, agents,
             output_ag_frobnorm_mat_list.append( ag_fnorm1 )
             output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
-
-        if not evaluation_epoch:
-            #
-            # update target network for actors
-            for agent in agents:
-                agent.copy_weights_to_target()
-
         #
         # store losses in the loss list
         if not sqloutput is None:
@@ -375,6 +368,12 @@ def ddqn_episode_mc(building, building_occ, agents,
 
         if timestep % 20 == 0:
             print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
+
+    #
+    # update target network for actors
+    if not evaluation_epoch and episode_number % 3 == 0:
+        for agent in agents:
+            agent.copy_weights_to_target()
 
     #
     # elements, that should be stored only once per episode
