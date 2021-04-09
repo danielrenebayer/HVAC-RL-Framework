@@ -16,7 +16,11 @@ def get_argparser():
     parser.add_argument('--rpb_buffer_size', type=int, default=12*24*2)
     parser.add_argument('--lambda_rwd_mstpc', type=float, default=0.2)
     parser.add_argument('--lambda_rwd_energy', type=float, default=0.001)
-    parser.add_argument('--alternate_reward',     action='store_true', help="Alternate reward: ignore energy and manual setpoint changes, use rulebased reward instead.")
+    parser.add_argument('--reward_function', type=str, default="sum_energy_mstpc", choices=[
+        "sum_energy_mstpc", "rulebased_roomtemp",
+        "rulebased_agent_output"
+        ], help="Select the reward function. Alternate reward: ignore energy and manual setpoint changes, use rulebased reward instead.")
+    parser.add_argument('--log_reward', action='store_true', help="If set, the logarithm to base e is applied to -reward+1.")
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--ou_theta', type=float, default=0.3)

@@ -106,10 +106,15 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
 
         #
         # reward computation
-        if not hyper_params is None and hyper_params.alternate_reward:
-            reward = - LAMBDA_REWARD_MANU_STP_CHANGES * alternate_reward_fn(state, building)
-        else:
+        if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
             reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+        elif hyper_params.reward_function == "rulebased_roomtemp":
+            reward = - reward_fn_rulebased_roomtemp(state, building)
+        #elif hyper_params.reward_function == "rulebased_agent_output":
+        else:
+            reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
+        if not hyper_params is None and hyper_params.log_reward:
+            reward = - np.log(-reward + 1)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -298,10 +303,15 @@ def ddqn_episode_mc(building, building_occ, agents,
 
         #
         # reward computation
-        if not hyper_params is None and hyper_params.alternate_reward:
-            reward = - LAMBDA_REWARD_MANU_STP_CHANGES * alternate_reward_fn(state, building)
-        else:
+        if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
             reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+        elif hyper_params.reward_function == "rulebased_roomtemp":
+            reward = - reward_fn_rulebased_roomtemp(state, building)
+        #elif hyper_params.reward_function == "rulebased_agent_output":
+        else:
+            reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
+        if not hyper_params is None and hyper_params.log_reward:
+            reward = - np.log(-reward + 1)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -609,7 +619,12 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
 
 
-def alternate_reward_fn(state, building):
+def reward_fn_rulebased_roomtemp(state, building):
+    """
+    This is an alternative reward function.
+    It loops over all rooms, returning a (positiv) reward, iff the temperature is out of a given band.
+    The band changes between office hours (Mo - Fr, 7.00 - 18.00) and the rest of the time.
+    """
     changed_magnitude = 0
     dto = state['time']
     temp_values = state['temperature']
@@ -630,6 +645,30 @@ def alternate_reward_fn(state, building):
 
 
 
+
+def reward_fn_rulebased_agent_output(state, agent_actions_dict):
+    """
+    This is another alternative reward function.
+    It loops over all agents, returning a (positiv) reward, iff the agent-computed heating setpoint is out of a given band.
+    The band changes between office hours (Mo - Fr, 7.00 - 18.00) and the rest of the time.
+    """
+    changed_magnitude = 0
+    dto = state['time']
+    for agent, agent_actions in agent_actions_dict.items():
+        agent_heating_setpoint = agent_actions["Zone Heating/Cooling-Mean Setpoint"] - agent_actions["Zone Heating/Cooling-Delta Setpoint"]
+        if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
+            # if the temperature is not in the range [21,23.5], change the setpoint
+            if agent_heating_setpoint < 21.0:
+                changed_magnitude += 21.0 - agent_heating_setpoint
+            elif agent_heating_setpoint > 23.5:
+                changed_magnitude += agent_heating_setpoint - 23.5
+        else:
+            # if the temperature is not in the range [15,17], change the setpoint
+            if agent_heating_setpoint < 15:
+                changed_magnitude += 15 - agent_heating_setpoint
+            elif agent_heating_setpoint > 17:
+                changed_magnitude += agent_heating_setpoint - 17
+    return changed_magnitude
 
 
 
