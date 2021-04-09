@@ -41,14 +41,9 @@ def main(args):
 
     #
     # Define the building and the occupants
-    if args.model == "5ZoneAirCooled_SingleAgent":
-        building = DefaultBuildings.Building_5ZoneAirCooled_SingleAgent(args)
-    elif args.model == "5ZoneAirCooled_SmallAgents":
-        building = DefaultBuildings.Building_5ZoneAirCooled_SmallAgents(args)
-    elif args.model == "5ZoneAirCooled_SmallSingleAgent":
-        building = DefaultBuildings.Building_5ZoneAirCooled_SmallSingleAgent(args)
-    else:
-        building = DefaultBuildings.Building_5ZoneAirCooled(args)
+    if args.model not in DefaultBuildings.__dict__.keys():
+        raise AttributeError(f"{args.model} is no model in DefaultBuildings.py!")
+    building = DefaultBuildings.__dict__[ args.model ](args)
 
     sqloutput = SQLOutput(os.path.join(args.checkpoint_dir, "ouputs.sqlite"), building)
     if not args.continue_training:
