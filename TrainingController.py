@@ -112,7 +112,7 @@ def main(args):
     # write the status object
     status_dict["next_episode_offset"] = args.episodes_count + episode_offset
     f = open(os.path.join(args.checkpoint_dir, "status.pickle"), "wb")
-    pickle.dump(f, status_dict)
+    pickle.dump(status_dict, f)
     f.close()
 
 
