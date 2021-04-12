@@ -250,7 +250,7 @@ class AgentRL:
             mtarget_param.data.copy_(mactor_param.data)
 
         # initialize the optimizer
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self._init_optimizer()
 
         # initialize the OU-Process
         self.ou_process = OrnsteinUhlenbeckProcess(theta = self.ou_theta,
@@ -274,10 +274,23 @@ class AgentRL:
         self.trafo_matrix = torch.stack(trafo_list).T
 
         # Move things to GPU, if selected
+        self._init_cuda()
+
+    def _init_optimizer(self):
+        """
+        Initializes the optimizers.
+        """
+        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+
+    def _init_cuda(self):
+        """
+        Moves all models to the GPU.
+        """
         if self.use_cuda:
-            self.model_actor = self.model_actor.to(0)
-            self.model_target= self.model_target.to(0)
+            self.model_actor  = self.model_actor.to(0)
+            self.model_target = self.model_target.to(0)
             self.trafo_matrix = self.trafo_matrix.to(0)
+            self._init_optimizer()
 
     def optimizer_step(self):
         """
@@ -394,6 +407,8 @@ class AgentRL:
     def load_models_from_disk(self, storage_dir, prefix=""):
         self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        self._init_optimizer()
+        self._init_cuda()
 
 
 
@@ -457,8 +472,8 @@ class QNetwork:
 
         self.output_size = len(self.output_to_action_mapping)
         input_size   = len(self.input_parameters)
-        hidden_size1 = (2*input_size+  self.output_size) // 3
-        hidden_size2 = (  input_size+2*self.output_size) // 3
+        hidden_size1 =  3*input_size+  self.output_size
+        hidden_size2 = (hidden_size1+2*self.output_size) // 3
 
         self.model_actor = torch.nn.Sequential(
             torch.nn.Linear(input_size, hidden_size1),
@@ -478,14 +493,14 @@ class QNetwork:
         for m_param in self.model_actor.parameters():
             if len(m_param.shape) == 1:
                 # other initialization for biases
-                torch.nn.init.constant_(m_param, 0.001)
+                torch.nn.init.constant_(m_param, 0.00001)
             else:
-                torch.nn.init.normal_(m_param, 0.0, 1.0)
+                torch.nn.init.normal_(m_param, 0.0, 0.8)
         # copy weights from actor -> target
         self.copy_weights_to_target()
 
         # initialize the optimizer
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self._init_optimizer()
 
         # define the transformation matrix
         trafo_list = []
@@ -503,16 +518,29 @@ class QNetwork:
         self.trafo_matrix = torch.stack(trafo_list).T
 
         # Move things to GPU, if selected
-        if self.use_cuda:
-            self.model_actor = self.model_actor.to(0)
-            self.model_target= self.model_target.to(0)
-            self.trafo_matrix = self.trafo_matrix.to(0)
+        self._init_cuda()
 
     def optimizer_step(self):
         """
         Applies on step by the optimizer.
         """
         self.optimizer.step()
+
+    def _init_optimizer(self):
+        """
+        Initializes the optimizers.
+        """
+        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+
+    def _init_cuda(self):
+        """
+        Moves all models to the GPU.
+        """
+        if self.use_cuda:
+            self.model_actor  = self.model_actor.to(0)
+            self.model_target = self.model_target.to(0)
+            self.trafo_matrix = self.trafo_matrix.to(0)
+            self._init_optimizer()
 
     def copy_weights_to_target(self):
         """
@@ -580,6 +608,8 @@ class QNetwork:
     def load_models_from_disk(self, storage_dir, prefix=""):
         self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        self._init_optimizer()
+        self._init_cuda()
 
 
 
