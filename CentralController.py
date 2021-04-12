@@ -592,6 +592,11 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch)
         elif args.algorithm == "ddqn":
+            # set epsilon for all agents
+            epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
+            for agent in agents:
+                agent.epsilon = epsilon
+            # run one episode
             ddqn_episode_mc(
                         building,
                         building_occ,
