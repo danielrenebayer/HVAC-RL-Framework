@@ -42,10 +42,10 @@ def get_argparser():
     parser.add_argument('--network_storage_frequency',type=int, default=10, help="Number of episodes until the next storage of the networks (critcs and agents)")
     parser.add_argument('--checkpoint_dir', type=str, default="checkpoints/" + datetime.datetime.now().strftime("%Y%m%d-%H%M"))
     parser.add_argument('--model', type=str, default="5ZoneAirCooled", choices=[
-        "5ZoneAirCooled", "5ZoneAirCooled_SmallAgents",
+        "Building_5ZoneAirCooled", "Building_5ZoneAirCooled_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint", "Building_5ZoneAirCooled_SingleSetpoint_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent",
-        "5ZoneAirCooled_SingleAgent", "5ZoneAirCooled_SmallSingleAgent"])
+        "Building_5ZoneAirCooled_SingleAgent", "Building_5ZoneAirCooled_SmallSingleAgent"])
     parser.add_argument('--number_occupants', type=int, default=40)
     parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")
     parser.add_argument('--load_models_episode', type=int, default=0, help="The episode to load. If load_models_from_path is set to an empty string, it will be ignored.")
