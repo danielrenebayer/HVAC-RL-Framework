@@ -2,6 +2,7 @@
 import os
 import torch
 import pickle
+import timeit
 import datetime
 import numpy as np
 from copy import deepcopy
@@ -231,11 +232,17 @@ def ddqn_episode_mc(building, building_occ, agents,
         RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
         LEARNING_RATE   = hyper_params.lr
     #
+    # define the output dict containing status informations
+    status_output_dict = {}
+    #
     # Define the replay ReplayBuffer
     rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # Define the loss
     loss = torch.nn.MSELoss()
+    #
+    # Lists for command-line outputs
+    reward_list = []
     #
     # prepare the simulation
     state = building.model.reset()
@@ -312,6 +319,8 @@ def ddqn_episode_mc(building, building_occ, agents,
             reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
         if not hyper_params is None and hyper_params.log_reward:
             reward = - np.log(-reward + 1)
+        # add reward to output list for command-line outputs
+        reward_list.append(reward)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -371,14 +380,24 @@ def ddqn_episode_mc(building, building_occ, agents,
 
     #
     # update target network for actors
+    status_output_dict["target_network_update"] = False
     if not evaluation_epoch and episode_number % 3 == 0:
         for agent in agents:
             agent.copy_weights_to_target()
+        status_output_dict["target_network_update"] = True
 
     #
-    # elements, that should be stored only once per episode
-    if not sqloutput is None:
-        sqloutput.add_last_step_of_episode( locals() )
+    # status output dict postprocessing
+    status_output_dict["episode"]     = episode_number
+    status_output_dict["lr"]          = LEARNING_RATE
+    status_output_dict["tau"]         = TAU_TARGET_NETWORKS
+    status_output_dict["lambda_energy"] = LAMBDA_REWARD_ENERGY
+    status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
+    status_output_dict["reward_mean"] = np.mean(reward_list)
+    status_output_dict["reward_sum"]  = np.sum(reward_list)
+    status_output_dict["evaluation_epoch"] = evaluation_epoch
+    status_output_dict["random_process_addition"] = add_random_process
+    return status_output_dict
 
 
 
@@ -597,6 +616,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
             for agent in agents:
                 agent.epsilon = epsilon
             # run one episode
+            t_start = timeit.default_timer()
+            status_output_dict = \
             ddqn_episode_mc(
                         building,
                         building_occ,
@@ -607,6 +628,14 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch)
+            t_end  = timeit.default_timer()
+            t_diff = t_end - t_start
+            status_output_dict["epsilon"] = epsilon
+            status_output_dict["t_diff"]  = t_diff
+            print(f"Episode {n_episode:5} finished: mean reward = {status_output_dict['reward_mean']:9.4f}, epsilon = {epsilon:.4f}, time = {t_diff:6.1f}s, random process = {status_output_dict['random_process_addition']}, eval. epoch = {status_output_dict['evaluation_epoch']}, target w. upd. = {status_output_dict['target_network_update']}")
+            # store detailed output
+            if not sqloutput is None:
+                sqloutput.add_last_step_of_episode( status_output_dict )
 
         # save agent/critic networks every selected run
         if (n_episode+1) % args.network_storage_frequency == 0:

@@ -41,13 +41,18 @@ class SQLOutput():
         # output vars every episode at the end accumulated or somehow aggreated
         self.output_vars_eels = {
             "episode":  ["integer", "episode_number"],
-            "lr":       ["integer", "LEARNING_RATE"],
-            "tau":      ["float",   "TAU_TARGET_NETWORKS"],
+            "lr":       ["integer", "lr"],
+            "tau":      ["float",   "tau"],
             "ou_theta": ["float",   None],
             "ou_sigma": ["float",   None],
             "ou_mu":    ["float",   None],
-            "lambda_energy":  ["float","LAMBDA_REWARD_ENERGY"],
-            "lambda_manu_stp":["float","LAMBDA_REWARD_MANU_STP_CHANGES"]
+            "lambda_energy":  ["float","lambda_energy"],
+            "lambda_manu_stp":["float","lambda_manu_stp"],
+            "epsilon":  ["float",   "epsilon"],
+            "time_cons":["float",   "t_diff"],
+            "target_netw_u":  ["boolean", "target_network_update"],
+            "eval_epoch":     ["boolean", "evaluation_epoch"],
+            "random_process_addition": ["boolean","random_process_addition"]
         }
 
         # output vars after some episodes, but every step
@@ -149,8 +154,10 @@ class SQLOutput():
     def add_last_step_of_episode(self, local_vars):
         dict_for_db = {}
         for colname, (_, lvarname) in self.output_vars_eels.items():
-            if not lvarname is None:
+            if not lvarname is None and lvarname in local_vars.keys():
                 dict_for_db[colname] = local_vars[lvarname]
+            else:
+                dict_for_db[colname] = 0
         self._propagate_to_db("eels", dict_for_db)
 
 
