@@ -9,6 +9,7 @@ def get_argparser():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--algorithm', type=str, default="ddpg", choices=["ddpg", "ddqn", "rule-based"], help="If 'rule-based' is selected, it will perform a evaluation for one episode only, instead of a complete training with a RL agent and critics.")
+    parser.add_argument('--ts_per_hour', type=int, default=12, help="Numer of timesteps per hour. Should be a divisor of 60, to get a perfect matching minutes resolution.")
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--tau', type=float, default=0.01)
     parser.add_argument('--discount_factor', type=float, default=0.9)

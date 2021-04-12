@@ -16,7 +16,8 @@ import RLCritics
 def ddpg_episode_mc(building, building_occ, agents, critics,
         hyper_params = None, episode_number = 0, sqloutput = None,
         extended_logging = False, evaluation_epoch = False,
-        add_ou_in_eval_epoch = False):
+        add_ou_in_eval_epoch = False,
+        ts_diff_in_min = 5):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -54,7 +55,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         currdate = state['time']
         #
         # request occupancy for the next state
-        nextdate = state['time'] + datetime.timedelta(minutes=5)
+        nextdate = state['time'] + datetime.timedelta(minutes=ts_diff_in_min)
         next_occupancy = building_occ.draw_sample(nextdate)
         #
         # propagate occupancy values to COBS / EnergyPlus
@@ -212,7 +213,8 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
 def ddqn_episode_mc(building, building_occ, agents,
         hyper_params = None, episode_number = 0, sqloutput = None,
         extended_logging = False, evaluation_epoch = False,
-        add_epsilon_greedy_in_eval_epoch = False):
+        add_epsilon_greedy_in_eval_epoch = False,
+        ts_diff_in_min = 5):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -259,7 +261,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         currdate = state['time']
         #
         # request occupancy for the next state
-        nextdate = state['time'] + datetime.timedelta(minutes=5)
+        nextdate = state['time'] + datetime.timedelta(minutes=ts_diff_in_min)
         next_occupancy = building_occ.draw_sample(nextdate)
         #
         # propagate occupancy values to COBS / EnergyPlus
@@ -430,7 +432,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     episode_start_day  = args.episode_start_day
     episode_start_month= args.episode_start_month
     building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
-    building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
+    building.model.set_timestep( args.ts_per_hour )
     #
     # Define the agents
     agents = []
@@ -449,6 +451,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
     current_occupancy = building_occ.draw_sample( state["time"] )
     timestep   = 0
     last_state = None
+    ts_diff_in_min = 60 // args.ts_per_hour
     #
     # lists for storing all states and all actions taken
     episode_states_list  = []
@@ -462,7 +465,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         currdate = state['time']
         #
         # request occupancy for the next state
-        nextdate = state['time'] + datetime.timedelta(minutes=5)
+        nextdate = state['time'] + datetime.timedelta(minutes=ts_diff_in_min)
         next_occupancy = building_occ.draw_sample(nextdate)
         #
         # propagate occupancy values to COBS / EnergyPlus
@@ -593,8 +596,9 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     episode_len        = args.episode_length
     episode_start_day  = args.episode_start_day
     episode_start_month= args.episode_start_month
+    ts_diff_in_min     = 60 // args.ts_per_hour
     building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
-    building.model.set_timestep(12) # 5 Min interval, 12 steps per hour
+    building.model.set_timestep( args.ts_per_hour )
 
     for n_episode in range(episode_offset, n_episodes + episode_offset):
 
@@ -609,7 +613,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         sqloutput,
                         (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0,
-                        args.add_ou_in_eval_epoch)
+                        args.add_ou_in_eval_epoch,
+                        ts_diff_in_min)
         elif args.algorithm == "ddqn":
             # set epsilon for all agents
             epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
@@ -627,7 +632,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         sqloutput,
                         (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0,
-                        args.add_ou_in_eval_epoch)
+                        args.add_ou_in_eval_epoch,
+                        ts_diff_in_min)
             t_end  = timeit.default_timer()
             t_diff = t_end - t_start
             status_output_dict["epsilon"] = epsilon
