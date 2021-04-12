@@ -50,6 +50,7 @@ def get_argparser():
     parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")
     parser.add_argument('--load_models_episode', type=int, default=0, help="The episode to load. If load_models_from_path is set to an empty string, it will be ignored.")
     parser.add_argument('--continue_training', action='store_true', help="If this parameter is given, the controller loads the existing models from the checkpoints dir. If the file `status.pickle` does not exist in checkpoints dir, it will start a new training run.")
+    parser.add_argument('--eplus_storage_mode', action='store_true', help="Disable the restarting of EnergyPlus simulation at the beginning of a episode, use the old values instead again")
     parser.add_argument('--idf_file', type=str, default="", help="Path to the EPlus IDF file.")
     parser.add_argument('--epw_file', type=str, default="", help="Path to the EPlus weather file.")
     parser.add_argument('--rulebased_setpoint_unoccu_mean',  type=float, default=23.0)

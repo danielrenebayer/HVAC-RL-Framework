@@ -41,7 +41,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # prepare the simulation
-    state = building.model.reset()
+    state = building.model_reset()
     SU.fix_year_confussion(state)
     norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
     #
@@ -49,7 +49,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     timestep   = 0
     last_state = None
     # start the simulation loop
-    while not building.model.is_terminate():
+    while not building.model_is_terminate():
         actions = list()
         
         currdate = state['time']
@@ -91,7 +91,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         norm_state_ten_last = norm_state_ten
         last_state = state
         timestep  += 1
-        state      = building.model.step(actions)
+        state      = building.model_step(actions)
         current_occupancy = next_occupancy
         SU.fix_year_confussion(state)
 
@@ -247,7 +247,7 @@ def ddqn_episode_mc(building, building_occ, agents,
     reward_list = []
     #
     # prepare the simulation
-    state = building.model.reset()
+    state = building.model_reset()
     SU.fix_year_confussion(state)
     norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
     #
@@ -255,7 +255,7 @@ def ddqn_episode_mc(building, building_occ, agents,
     timestep   = 0
     last_state = None
     # start the simulation loop
-    while not building.model.is_terminate():
+    while not building.model_is_terminate():
         actions = list()
 
         currdate = state['time']
@@ -295,7 +295,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         norm_state_ten_last = norm_state_ten
         last_state = state
         timestep  += 1
-        state      = building.model.step(actions)
+        state      = building.model_step(actions)
         current_occupancy = next_occupancy
         SU.fix_year_confussion(state)
 

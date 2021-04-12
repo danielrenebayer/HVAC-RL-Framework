@@ -4,6 +4,7 @@ This file contains the default buildings, that can be used in EnergyPlus using t
 
 import os
 import cobs
+from copy import deepcopy
 from global_paths import global_paths
 
 class Building_5ZoneAirCooled:
@@ -84,6 +85,14 @@ class Building_5ZoneAirCooled:
         if not args is None:
             idx = model.run_parameters.index("-d")
             model.run_parameters[idx + 1] = os.path.join(args.checkpoint_dir, "result")
+        #
+        # Save all model outputs, if args.eplus_storage_mode is given
+        self.storage_mode = False
+        if not args is None and args.eplus_storage_mode:
+            self.storage_mode = True
+            self._storage_list_full = False
+            self._storage_next_idx  = 0
+            self.storage_list = []
         #
         #
         # generate edd file (which lists the possible actions):
@@ -185,6 +194,47 @@ class Building_5ZoneAirCooled:
             #else:
             #    print(f"Action {action_name} from agent in zone {zone} unknown.")
         return actions
+
+    def model_step(self, actions):
+        """
+        Sends the current actions to the model and obtains the new state.
+        If storage_mode is active (by args.eplus_storage_mode), it
+        use the informations from the storage, if model_reset() has be callen
+        after there was content in the storage buffer.
+        """
+        if self.storage_mode:
+            if self._storage_list_full:
+                newstate = self.storage_list[ self._storage_next_idx ]
+                self._storage_next_idx += 1
+                return newstate
+            else:
+                newstate = self.model.step(actions)
+                self.storage_list.append(deepcopy(newstate))
+                return newstate
+        else:
+            return self.model.step(actions)
+
+    def model_is_terminate(self):
+        if self.storage_mode and self._storage_list_full:
+            return self._storage_next_idx >= len(self.storage_list)
+        else:
+            return self.model.is_terminate()
+
+    def model_reset(self):
+        if self.storage_mode:
+            if self._storage_list_full:
+                self._storage_next_idx  = 0
+                return self.model_step( [] )
+            elif len(self.storage_list) > 0:
+                self._storage_list_full = True
+                self._storage_next_idx  = 0
+                return self.model_step( [] )
+            else:
+                first_state = self.model.reset()
+                self.storage_list.append(deepcopy(first_state))
+                return first_state
+        else:
+            return self.model.reset()
 
 class Building_5ZoneAirCooled_SmallAgents(Building_5ZoneAirCooled):
     def __init__(self, args = None):
