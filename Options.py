@@ -41,7 +41,7 @@ def get_argparser():
     parser.add_argument('--critic_w_l2', type=float, default=0.00001, help="L2 penalty for critic parameters")
     parser.add_argument('--network_storage_frequency',type=int, default=10, help="Number of episodes until the next storage of the networks (critcs and agents)")
     parser.add_argument('--checkpoint_dir', type=str, default="checkpoints/" + datetime.datetime.now().strftime("%Y%m%d-%H%M"))
-    parser.add_argument('--model', type=str, default="5ZoneAirCooled", choices=[
+    parser.add_argument('--model', type=str, default="Building_5ZoneAirCooled", choices=[
         "Building_5ZoneAirCooled", "Building_5ZoneAirCooled_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint", "Building_5ZoneAirCooled_SingleSetpoint_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent",
