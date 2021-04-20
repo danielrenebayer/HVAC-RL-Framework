@@ -680,67 +680,7 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
                 if output_dic["Zone VAV Reheat Damper Position"] < 0.9:
                     output_dic["Zone VAV Reheat Damper Position"] = 0.9
         return output_dic
-    
-    
-    
 
 
-
-
-class OneAgentOneDevice:
-    
-    
-    def __init__(self, device_class, rl_storage_filepath=None):
-        """
-        Constructs a controlling agent for a (single) existing device.
-        
-        Parameters
-        ----------
-        device_class : str
-            The name of the class of the device, e.g. 'VAV Reheat', 'Central Boiler' or 'Central Chiller'
-        rl_storage_filepath : str
-            Defaults to None.
-            The path to the file containing the serialized object of the already trained RL-agent
-            If this parameter is not set, it will use a randomly initialized RL-agent
-        """
-        if device_class == "Central Boiler":
-            self.input_parameters = ["Outdoor Temp", "Outdoor Hum", "..."]
-            self.controlled_parameters = ["setpoint"]
-
-
-
-
-
-class OneAgentOneZone:
-    
-    
-    def __init__(self, zone_class, rl_storage_filepath=None):
-        """
-        Constructs a controlling agent for a zone.
-        
-        Parameters
-        ----------
-        device_class : str
-            The name of the class of the device, e.g. 'VAV Reheat', 'Central Boiler' or 'Central Chiller'
-        rl_storage_filepath : str
-            Defaults to None.
-            The path to the file containing the serialized object of the already trained RL-agent
-            If this parameter is not set, it will use a randomly initialized RL-agent
-        """
-        if zone_class == "VAV with Reheat,Heating,Cooling,NoRL":
-            self.input_parameters = [
-                "Outdoor Air Temperature",
-                "Outdoor Air Humidity",
-                "Outdoor Wind Speed",
-                'Outdoor Wind Direction',
-                'Outdoor Solar Radi Diffuse',
-                'Outdoor Solar Radi Direct',
-                "Zone Relative Humidity",
-                "Zone VAV",
-                "Zone CO2"
-                "Zone Temperature"]
-            self.controlled_parameters = ["VAV Setpoint", "Zone Heating Setpoint", "Zone Cooling Setpoint"]
-        else:
-            raise AttributeError(f"Unknown zone class: {zone_class}")
 
 
