@@ -76,7 +76,7 @@ class CriticMergeAndOnlyFC:
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(m_param.data)
         # init optimizer and loss
-        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self._init_optimizer()
         self.loss      = torch.nn.MSELoss()
         # define the transformation matrix
         trafo_list = []
@@ -87,10 +87,25 @@ class CriticMergeAndOnlyFC:
             trafo_list.append(row)
         self.trafo_matrix = torch.stack(trafo_list).T
         # cuda?
+        self._init_cuda()
+
+
+    def _init_optimizer(self):
+        """
+        Initializes the optimizers.
+        """
+        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = self.lr, weight_decay = self.w_l2)
+
+
+    def _init_cuda(self):
+        """
+        Moves all models to the GPU.
+        """
         if self.use_cuda:
             self.model_target = self.model_target.to(0)
             self.model = self.model.to(0)
             self.trafo_matrix = self.trafo_matrix.to(0)
+            self._init_optimizer()
 
 
     def compute_loss_and_optimize(self, q_tensor, y_tensor, no_backprop = False):
@@ -210,4 +225,6 @@ class CriticMergeAndOnlyFC:
     def load_models_from_disk(self, storage_dir, prefix=""):
         self.model = torch.load(os.path.join(storage_dir, prefix + "_model.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        self._init_optimizer()
+        self._init_cuda()
 
