@@ -14,7 +14,7 @@ variable_ranges = {
     'Outdoor Wind Direction':  (  0.0,  360.0),
     'Outdoor Solar Radi Diffuse': (0.0,1000.0),
     'Outdoor Solar Radi Direct':  (0.0, 200.0),
-    "Zone VAV Reheat Damper Position": (0.0,1.0),
+    "Zone VAV Reheat Damper Position": (0.15,1.0),
     "Zone Relative Humidity":  (  0.0,  100.0),
     "Zone CO2":                (410.0, 5000.0),
     "Zone Temperature":        ( 10.0,   40.0),
