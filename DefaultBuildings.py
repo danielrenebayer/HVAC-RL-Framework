@@ -345,6 +345,10 @@ class Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent(Building_5ZoneAirC
             self.agent_device_pairing = {"MainAgent":
                                              ("all", "SingleSetpoint,SingleAgent,Q,RL,VerySmall2")
                                         }
+        elif args.algorithm == "ddpg":
+            self.agent_device_pairing = {"MainAgent":
+                                            ("all", "5ZoneAirCooled,SingleAgent,SingleSetpoint,RL,VerySmall")
+                                        }
         else:
             raise AttributeError(f"{args.algorithm} is not available for the class Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent")
 
