@@ -37,8 +37,14 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
         LEARNING_RATE   = hyper_params.lr
     #
+    # define the output dict containing status informations
+    status_output_dict = {}
+    #
     # Define the replay ReplayBuffer
     rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
+    #
+    # Lists for command-line outputs
+    reward_list = []
     #
     # prepare the simulation
     state = building.model_reset()
@@ -117,6 +123,8 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
             reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
         if not hyper_params is None and hyper_params.log_reward:
             reward = - np.log(-reward + 1)
+        # add reward to output list for command-line outputs
+        reward_list.append(reward)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -178,17 +186,6 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
             output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
 
-        if not evaluation_epoch:
-            #
-            # update target critic
-            for critic in critics:
-                critic.update_target_network(TAU_TARGET_NETWORKS)
-
-            #
-            # update target network for actor
-            for agent in agents:
-                agent.update_target_network(TAU_TARGET_NETWORKS)
-
         #
         # store losses in the loss list
         if not sqloutput is None:
@@ -199,13 +196,35 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         if extended_logging and not sqloutput is None:
             sqloutput.add_every_step_of_some_episodes( locals() )
 
-        if timestep % 20 == 0:
-            print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
+        if timestep % 200 == 0:
+            eval_ep_str     = "  " if evaluation_epoch   else "no"
+            rand_pr_add_str = "  " if add_ou_process     else "no"
+            print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.")
 
     #
-    # elements, that should be stored only once per episode
-    if not sqloutput is None:
-        sqloutput.add_last_step_of_episode( locals() )
+    # update target networks
+    status_output_dict["target_network_update"] = False
+    if not evaluation_epoch and episode_number % 3 == 0:
+        # update target critic
+        for critic in critics:
+            critic.update_target_network(TAU_TARGET_NETWORKS)
+        # update target network for actor
+        for agent in agents:
+            agent.update_target_network(TAU_TARGET_NETWORKS)
+        status_output_dict["target_network_update"] = True
+
+    #
+    # status output dict postprocessing
+    status_output_dict["episode"]     = episode_number
+    status_output_dict["lr"]          = LEARNING_RATE
+    status_output_dict["tau"]         = TAU_TARGET_NETWORKS
+    status_output_dict["lambda_energy"] = LAMBDA_REWARD_ENERGY
+    status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
+    status_output_dict["reward_mean"] = np.mean(reward_list)
+    status_output_dict["reward_sum"]  = np.sum(reward_list)
+    status_output_dict["evaluation_epoch"] = evaluation_epoch
+    status_output_dict["random_process_addition"] = add_ou_process
+    return status_output_dict
 
 
 
@@ -350,8 +369,6 @@ def ddqn_episode_mc(building, building_occ, agents,
             y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
             # compute Q for state1
             q = agent.step_tensor(b_state1, use_actor = True).gather(1, b_action[:, agent_id][:, np.newaxis])
-            #print("S Shape", q.shape, "Y SHAPE", y.shape)
-            assert q.shape == y.shape, "Shape missmatch."
             # update agent by minimizing the loss L
             L = loss(q, y)
             L.backward()
@@ -378,7 +395,12 @@ def ddqn_episode_mc(building, building_occ, agents,
             sqloutput.add_every_step_of_some_episodes( locals() )
 
         if timestep % 20 == 0:
-            print(f"episode {episode_number:3}, timestep {timestep:5}: {state['time']}")
+            eval_ep_str     = "  " if evaluation_epoch   else "no"
+            rand_pr_add_str = "  " if add_random_process else "no"
+            if timestep % 200 == 0:
+                print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.")
+            #else:
+            #    print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.", end="\r")
 
     #
     # update target network for actors
@@ -602,7 +624,19 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
     for n_episode in range(episode_offset, n_episodes + episode_offset):
 
+        t_start = timeit.default_timer()
+
         if args.algorithm == "ddpg":
+            # set ou-parameters for all agents
+            ou_mu    = 0.0
+            ou_theta = max(args.ou_theta, np.exp(n_episode * np.log(args.ou_theta / 3) / args.epsilon_final_step))
+            ou_sigma = max(args.ou_sigma, np.exp(n_episode * np.log(args.ou_sigma / 3) / args.epsilon_final_step))
+            for agent in agents:
+                agent.ou_theta = ou_theta
+                agent.ou_sigma = ou_sigma
+                agent.ou_mu    = ou_mu
+            # run one episode
+            status_output_dict = \
             ddpg_episode_mc(
                         building,
                         building_occ,
@@ -615,13 +649,16 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch,
                         ts_diff_in_min)
+            status_output_dict["ou_theta"] = ou_theta
+            status_output_dict["ou_sigma"] = ou_sigma
+            status_output_dict["ou_mu"]    = ou_mu
+
         elif args.algorithm == "ddqn":
             # set epsilon for all agents
             epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
             for agent in agents:
                 agent.epsilon = epsilon
             # run one episode
-            t_start = timeit.default_timer()
             status_output_dict = \
             ddqn_episode_mc(
                         building,
@@ -634,14 +671,17 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch,
                         ts_diff_in_min)
-            t_end  = timeit.default_timer()
-            t_diff = t_end - t_start
             status_output_dict["epsilon"] = epsilon
-            status_output_dict["t_diff"]  = t_diff
-            print(f"Episode {n_episode:5} finished: mean reward = {status_output_dict['reward_mean']:9.4f}, epsilon = {epsilon:.4f}, time = {t_diff:6.1f}s, random process = {status_output_dict['random_process_addition']}, eval. epoch = {status_output_dict['evaluation_epoch']}, target w. upd. = {status_output_dict['target_network_update']}")
-            # store detailed output
-            if not sqloutput is None:
-                sqloutput.add_last_step_of_episode( status_output_dict )
+
+        t_end  = timeit.default_timer()
+        t_diff = t_end - t_start
+        status_output_dict["t_diff"]  = t_diff
+        print(f"Episode {n_episode:5} finished: mean reward = {status_output_dict['reward_mean']:9.4f}, ", end="")
+        if args.algorithm == "ddqn": print(f"epsilon = {epsilon:.4f}, ", end="")
+        print(f"time = {t_diff:6.1f}s, random process = {status_output_dict['random_process_addition']}, eval. epoch = {status_output_dict['evaluation_epoch']}, target w. upd. = {status_output_dict['target_network_update']}")
+        # store detailed output
+        if not sqloutput is None:
+            sqloutput.add_last_step_of_episode( status_output_dict )
 
         # save agent/critic networks every selected run
         if (n_episode+1) % args.network_storage_frequency == 0:
