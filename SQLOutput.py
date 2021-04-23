@@ -149,6 +149,9 @@ class SQLOutput():
                     lvarval = local_vars[lvarname][idx]
                 dict_for_db[colname] = lvarval
             self._propagate_to_db("eeesea", dict_for_db)
+            # break loop, if there is no 
+            if agent.shared_network_per_agent_class:
+                break
 
 
     def add_last_step_of_episode(self, local_vars):

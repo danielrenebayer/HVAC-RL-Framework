@@ -296,13 +296,20 @@ def ddqn_episode_mc(building, building_occ, agents,
         # request new actions from all agents
         agent_actions_dict = {}
         agent_actions_list = []
-        for agent in agents:
-            add_random_process = True
-            if evaluation_epoch and not add_epsilon_greedy_in_eval_epoch:
-                add_random_process = False
-            new_action = agent.next_action(norm_state_ten, add_random_process)
-            agent_actions_list.append( new_action )
-            agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
+        add_random_process = True
+        if evaluation_epoch and not add_epsilon_greedy_in_eval_epoch:
+            add_random_process = False
+        if agents[0].shared_network_per_agent_class:
+            new_actions = agents[0].next_action(norm_state_ten, add_random_process)
+            agent_actions_list = new_actions
+            # decode the actions for every agent using the individual agent objects
+            for idx, agent in enumerate(agents):
+                agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_actions[idx])
+        else:
+            for agent in agents:
+                new_action = agent.next_action(norm_state_ten, add_random_process)
+                agent_actions_list.append( new_action )
+                agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
             # no backtransformation of variables needed, this is done in agents definition already
 
         #
@@ -361,7 +368,32 @@ def ddqn_episode_mc(building, building_occ, agents,
         output_cr_frobnorm_bia_list = [0 for _ in agents]
         output_ag_frobnorm_mat_list = []
         output_ag_frobnorm_bia_list = []
-        for agent_id, agent in enumerate(agents):
+        if agents[0].shared_network_per_agent_class:
+            #
+            # compute y (i.e. the TD-target)
+            #  Hint: s_{i+1} <- state2; s_i <- state1
+            agents[0].model_actor.zero_grad()
+            b_reward = b_reward.detach().expand(-1, len(agents) ).flatten()[:, np.newaxis]
+            # wrong: b_reward = b_reward.detach().repeat(len(agents), 1)
+            y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+            # compute Q for state1
+            q = agents[0].step_tensor(b_state1, use_actor = True).gather(1, b_action.flatten()[:, np.newaxis])
+            # update agent by minimizing the loss L
+            L = loss(q, y)
+            L.backward()
+            agents[0].optimizer_step()
+            #
+            # save outputs
+            output_loss_list.append(float(L.detach().numpy()))
+            # compute and store frobenius norms for the weights
+            ag_fnorm1, ag_fnorm2 = 0, 0
+            for p in agents[0].model_actor.parameters():
+                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
+        else:
+          for agent_id, agent in enumerate(agents):
             #
             # compute y (i.e. the TD-target)
             #  Hint: s_{i+1} <- state2; s_i <- state1
@@ -568,8 +600,17 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     """
 
     #
+    # prepair the load of existing models if selected
+    load_path    = ""
+    load_episode = 0
+    if args.load_models_from_path != "":
+        load_episode = args.load_models_episode
+        load_path    = os.path.abspath(args.load_models_from_path)
+
+    #
     # Define the agents
     agents = []
+    idx    = 0
     # HINT: a device can be a zone, too
     for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
         new_agent = agent_constructor( controlled_device_type )
@@ -577,8 +618,11 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                          name = agent_name,
                          args = args,
                          controlled_element = controlled_device,
-                         global_state_keys  = building.global_state_variables)
+                         global_state_keys  = building.global_state_variables,
+                         load_path          = load_path,  # loads the model from this path, if it is not empty
+                         load_prefix        = f"episode_{load_episode}_agent_{idx}")
         agents.append(new_agent)
+        idx += 1
 
     #
     # Define the critics
@@ -599,16 +643,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                     agents = agents,
                     global_state_keys=building.global_state_variables)
             critics.append(new_critic)
-
-    #
-    # Load existing models if selected
-    if args.load_models_from_path != "":
-        load_episode = args.load_models_episode
-        load_path    = os.path.abspath(args.load_models_from_path)
-        for idx, agent in enumerate(agents):
-            agent.load_models_from_disk(load_path,  prefix=f"episode_{load_episode}_agent_{idx}")
-            print(f"Agent {idx} loaded from {load_path}")
-        if args.algorithm == "ddpg":
+        # Load existing models if selected
+        if args.load_models_from_path != "":
             for idx, critic in enumerate(critics):
                 critic.load_models_from_disk(load_path, prefix=f"episode_{load_episode}_critic_{idx}")
                 print(f"Critic {idx} loaded from {load_path}")

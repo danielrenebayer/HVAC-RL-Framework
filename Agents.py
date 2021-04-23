@@ -428,6 +428,8 @@ class QNetwork:
     """
     This class represents a Q-network as required for DQN.
     """
+    _agent_class_shared_networks = {} # contains the elements "agent_class_name":agent_containing_the_network
+    _agent_class_shared_n_count  = {} # counts the number of agents for a given class
 
     def __init__(self, class_name):
         self.class_name = class_name
@@ -441,7 +443,7 @@ class QNetwork:
         self.controlled_element = ""
         self.optimizer = None
 
-    def initialize(self, name, controlled_element, global_state_keys, args = None):
+    def initialize(self, name, controlled_element, global_state_keys, args = None, load_path = "", load_prefix = ""):
         """
         Initializes the agent.
         This function should be callen after the creation of the object and the
@@ -457,6 +459,13 @@ class QNetwork:
             The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
         args : argparse
             Additional arguments, optional.
+        load_path : str
+            Defaults to "".
+            If it is not set to an empty string, the function will load the model from a given path.
+            Otherwise it will create a new model from scratch.
+        load_prefix : str
+            Defaults to "".
+            If load_path is given, this parameter can contain a additional prefix for the models.
         """
         if len(self.input_parameters) == 0 or len(self.controlled_parameters.keys()) == 0:
             raise RuntimeError("The number of input and output parameters has to be greater than 0")
@@ -467,6 +476,8 @@ class QNetwork:
         self.lr     = 0.001 if args is None else args.lr
         self.epsilon  = 0.05 if args is None else args.epsilon
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
+        self.shared_network_per_agent_class = False
+        self.shared_network_holding_agent   = None
 
         # In the end, an index of the output tensor represents an action.
         # We create this mapping here.
@@ -484,33 +495,9 @@ class QNetwork:
         input_size   = len(self.input_parameters)
         hidden_size1 =  3*input_size+  self.output_size
         hidden_size2 = (hidden_size1+2*self.output_size) // 3
-
-        self.model_actor = torch.nn.Sequential(
-            torch.nn.Linear(input_size, hidden_size1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size1, hidden_size2),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size2, self.output_size)
-        )
-        self.model_target = torch.nn.Sequential(
-            torch.nn.Linear(input_size, hidden_size1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size1, hidden_size2),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size2, self.output_size)
-        )
-        # change initialization
-        for m_param in self.model_actor.parameters():
-            if len(m_param.shape) == 1:
-                # other initialization for biases
-                torch.nn.init.constant_(m_param, 0.00001)
-            else:
-                torch.nn.init.normal_(m_param, 0.0, 0.8)
-        # copy weights from actor -> target
-        self.copy_weights_to_target()
-
-        # initialize the optimizer
-        self._init_optimizer()
+        self.input_size   = input_size
+        self.hidden_size1 = hidden_size1
+        self.hidden_size2 = hidden_size2
 
         # define the transformation matrix
         trafo_list = []
@@ -526,15 +513,73 @@ class QNetwork:
             row[idx] = 1.0
             trafo_list.append(row)
         self.trafo_matrix = torch.stack(trafo_list).T
+        if self.use_cuda:
+            self.trafo_matrix = self.trafo_matrix.to(0)
 
-        # Move things to GPU, if selected
-        self._init_cuda()
+        # create or load the models (target and actor)
+        # is shared network per agent class selected?
+        if not args is None and args.shared_network_per_agent_class:
+            self.shared_network_per_agent_class = True
+            if self.class_name in QNetwork._agent_class_shared_networks.keys():
+                # case 1: there is already a agent for this class containing
+                # all the models
+                QNetwork._agent_class_shared_n_count[ self.class_name ] += 1
+                self.shared_network_holding_agent = QNetwork._agent_class_shared_networks[ self.class_name ]
+                # append current transformation matrix to the end of the
+                # global transformation matrix
+                self.shared_network_holding_agent.shared_trafo_matrix = torch.cat([
+                    self.shared_network_holding_agent.shared_trafo_matrix,
+                    self.trafo_matrix], dim=1)
+            else:
+                # case 2: no agent initialized so far:
+                # this will be the agent containing all the models
+                QNetwork._agent_class_shared_networks[ self.class_name ] = self
+                QNetwork._agent_class_shared_n_count[  self.class_name ] = 1
+                self.shared_network_holding_agent = self
+                self._init_models_from_scratch()
+                self.shared_trafo_matrix = torch.zeros_like(self.trafo_matrix).copy_(self.trafo_matrix)
+        elif load_path != "":
+            self._load_models_from_disk(load_path, load_prefix)
+        else:
+            self._init_models_from_scratch()
 
     def optimizer_step(self):
         """
         Applies on step by the optimizer.
         """
         self.optimizer.step()
+
+    def _init_models_from_scratch(self):
+        """
+        Initializes the actor and target model from scratch.
+        """
+        self.model_actor = torch.nn.Sequential(
+            torch.nn.Linear(self.input_size,   self.hidden_size1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(self.hidden_size1, self.hidden_size2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(self.hidden_size2, self.output_size)
+        )
+        self.model_target = torch.nn.Sequential(
+            torch.nn.Linear(self.input_size,   self.hidden_size1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(self.hidden_size1, self.hidden_size2),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(self.hidden_size2, self.output_size)
+        )
+        # change initialization
+        for m_param in self.model_actor.parameters():
+            if len(m_param.shape) == 1:
+                # other initialization for biases
+                torch.nn.init.constant_(m_param, 0.00001)
+            else:
+                torch.nn.init.normal_(m_param, 0.0, 0.8)
+        # copy weights from actor -> target
+        self.copy_weights_to_target()
+        # initialize the optimizer
+        self._init_optimizer()
+        # Move things to GPU, if selected
+        self._init_cuda()
 
     def _init_optimizer(self):
         """
@@ -549,13 +594,14 @@ class QNetwork:
         if self.use_cuda:
             self.model_actor  = self.model_actor.to(0)
             self.model_target = self.model_target.to(0)
-            self.trafo_matrix = self.trafo_matrix.to(0)
             self._init_optimizer()
 
     def copy_weights_to_target(self):
         """
         copy weights from the actor network to the target network.
         """
+        if self.shared_network_per_agent_class and not self.shared_network_holding_agent is self:
+            return
         for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(mactor_param.data)
 
@@ -576,7 +622,11 @@ class QNetwork:
             state_tensor = torch.cat(state_tensor, dim=0)
         if self.use_cuda:
             state_tensor = state_tensor.to(0)
-        input_tensor = torch.matmul(state_tensor, self.trafo_matrix)
+        if self.shared_network_per_agent_class:
+            input_tensor = torch.matmul(state_tensor, self.shared_trafo_matrix)
+            input_tensor = input_tensor.reshape( (-1, self.input_size) )
+        else:
+            input_tensor = torch.matmul(state_tensor, self.trafo_matrix)
         if use_actor:
             output_tensor  = self.model_actor(input_tensor)
         else:
@@ -595,6 +645,22 @@ class QNetwork:
             If set to true, it will return (with a probability of self.epsilon) a random action.
             Defaults to False.
         """
+
+        if state.shape[0] > 1:
+            raise RuntimeError(f"State tensor must have 1 batch element! But the dimension is {state.shape}.")
+
+        if self.shared_network_per_agent_class:
+            # in case of shared networks per agent class:
+            # compute outputs first
+            action_ids = self.step_tensor(state, use_actor = True).detach().argmax(dim=1)
+            # and then apply random action selection
+            random_vals = np.random.rand(QNetwork._agent_class_shared_n_count[ self.class_name ])
+            for idx, smaller_epsilon in enumerate(random_vals <= self.epsilon):
+                if smaller_epsilon:
+                    action_ids[idx] = np.random.randint(0, self.output_size)
+            return action_ids.numpy().tolist()
+
+        # else:
         if np.random.rand() <= self.epsilon:
             # return random action
             return np.random.randint(0, self.output_size)
@@ -612,10 +678,14 @@ class QNetwork:
         return output_dict
 
     def save_models_to_disk(self, storage_dir, prefix=""):
+        # do not save anything, if the shared_network_mode is active
+        # and the agent is not the network holding agent
+        if self.shared_network_per_agent_class and not self.shared_network_holding_agent is self:
+            return
         torch.save(self.model_actor,  os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         torch.save(self.model_target, os.path.join(storage_dir, prefix + "_model_target.pickle"))
 
-    def load_models_from_disk(self, storage_dir, prefix=""):
+    def _load_models_from_disk(self, storage_dir, prefix=""):
         self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
         self._init_optimizer()
