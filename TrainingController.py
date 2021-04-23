@@ -28,11 +28,14 @@ from Options import get_argparser
 from SQLOutput import SQLOutput
 
 
-def main(args):
+def main(args = None):
     cobs.Model.set_energyplus_folder(global_paths["eplus"])
 
     parser = get_argparser()
-    args   = parser.parse_args()
+    if args is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(args)
     if args.continue_training and not os.path.exists(os.path.join(args.checkpoint_dir, "status.pickle")):
         args.continue_training = False
     os.makedirs(args.checkpoint_dir, exist_ok=True)
@@ -122,5 +125,5 @@ if __name__ == "__main__":
             args_parsed.extend( ln.split() )
         main(args_parsed)
     else:
-        main(sys.argv)
+        main()
 
