@@ -24,6 +24,7 @@ def get_argparser():
     parser.add_argument('--log_reward', action='store_true', help="If set, the logarithm to base e is applied to -reward+1.")
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
+    parser.add_argument('--target_network_update_freq', type=int, default=3)
     parser.add_argument('--ou_theta', type=float, default=0.3)
     parser.add_argument('--ou_mu', type=float, default=0.0)
     parser.add_argument('--ou_sigma', type=float, default=0.3)

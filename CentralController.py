@@ -28,6 +28,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         BATCH_SIZE = 128
         RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
         LEARNING_RATE = 0.01
+        TARGET_NETWORK_UPDATE_FREQ = 3
     else:
         LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
         LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
@@ -36,6 +37,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         BATCH_SIZE      = hyper_params.batch_size
         RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
         LEARNING_RATE   = hyper_params.lr
+        TARGET_NETWORK_UPDATE_FREQ = hyper_params.target_network_update_freq
     #
     # define the output dict containing status informations
     status_output_dict = {}
@@ -204,7 +206,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     #
     # update target networks
     status_output_dict["target_network_update"] = False
-    if not evaluation_epoch and episode_number % 3 == 0:
+    if episode_number % TARGET_NETWORK_UPDATE_FREQ == 0:
         # update target critic
         for critic in critics:
             critic.update_target_network(TAU_TARGET_NETWORKS)
@@ -244,6 +246,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         BATCH_SIZE = 128
         RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
         LEARNING_RATE = 0.01
+        TARGET_NETWORK_UPDATE_FREQ = 3
     else:
         LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
         LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
@@ -252,6 +255,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         BATCH_SIZE      = hyper_params.batch_size
         RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
         LEARNING_RATE   = hyper_params.lr
+        TARGET_NETWORK_UPDATE_FREQ = hyper_params.target_network_update_freq
     #
     # define the output dict containing status informations
     status_output_dict = {}
@@ -437,7 +441,7 @@ def ddqn_episode_mc(building, building_occ, agents,
     #
     # update target network for actors
     status_output_dict["target_network_update"] = False
-    if not evaluation_epoch and episode_number % 3 == 0:
+    if episode_number % TARGET_NETWORK_UPDATE_FREQ == 0:
         for agent in agents:
             agent.copy_weights_to_target()
         status_output_dict["target_network_update"] = True
