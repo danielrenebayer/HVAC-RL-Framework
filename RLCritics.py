@@ -7,6 +7,8 @@ import os
 import torch
 import numpy as np
 
+import RLUtilities
+
 class CriticMergeAndOnlyFC:
     """
     This critic is a neural network with 3 fully connected layer.
@@ -43,6 +45,7 @@ class CriticMergeAndOnlyFC:
         self.lr          = 0.001 if args is None else args.lr
         self.w_l2        = 0.00001 if args is None else args.critic_w_l2
         self.use_cuda    = torch.cuda.is_available() if args is None else args.use_cuda
+        self.optimizer_name = "adam" if args is None else args.optimizer
         if not args is None and args.critic_hidden_activation == "LeakyReLU":
             activation_fx     = torch.nn.LeakyReLU
         else:
@@ -94,7 +97,11 @@ class CriticMergeAndOnlyFC:
         """
         Initializes the optimizers.
         """
-        self.optimizer = torch.optim.Adam(params = self.model.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self.optimizer = RLUtilities.get_optimizer_from_args(
+                parameters = self.model.parameters(),
+                optimizer  = self.optimizer_name,
+                lr = self.lr,
+                weight_decay = self.w_l2)
 
 
     def _init_cuda(self):

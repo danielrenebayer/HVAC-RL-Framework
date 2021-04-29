@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import itertools
 
+import RLUtilities
 from RandomProcessExt import OrnsteinUhlenbeckProcess
 
 def agent_constructor(zone_class, rl_storage_filepath=None):
@@ -225,6 +226,7 @@ class AgentRL:
         self.ou_sigma = 0.3 if args is None else args.ou_sigma
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
         self.ou_update_freq = 1 if args is None else args.ou_update_freq
+        self.optimizer_name = "adam" if args is None else args.optimizer
         self._stepts_since_last_ou_update = self.ou_update_freq
         self._last_ou_sample = None
 
@@ -290,7 +292,11 @@ class AgentRL:
         """
         Initializes the optimizers.
         """
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self.optimizer = RLUtilities.get_optimizer_from_args(
+                parameters = self.model_actor.parameters(),
+                optimizer  = self.optimizer_name,
+                lr = self.lr,
+                weight_decay = self.w_l2)
 
     def _init_cuda(self):
         """
@@ -476,6 +482,7 @@ class QNetwork:
         self.lr     = 0.001 if args is None else args.lr
         self.epsilon  = 0.05 if args is None else args.epsilon
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
+        self.optimizer_name = "adam" if args is None else args.optimizer
         self.shared_network_per_agent_class = False
         self.shared_network_holding_agent   = None
 
@@ -585,7 +592,11 @@ class QNetwork:
         """
         Initializes the optimizers.
         """
-        self.optimizer = torch.optim.Adam(params = self.model_actor.parameters(), lr = self.lr, weight_decay = self.w_l2)
+        self.optimizer = RLUtilities.get_optimizer_from_args(
+                parameters = self.model_actor.parameters(),
+                optimizer  = self.optimizer_name,
+                lr = self.lr,
+                weight_decay = self.w_l2)
 
     def _init_cuda(self):
         """
