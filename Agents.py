@@ -93,6 +93,18 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
 
+    elif zone_class == "SingleSetpoint,SingleAgent,Q,RL":
+        new_agent = QNetwork(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Calendar Week",
+            "Outdoor Air Temperature",
+            'Outdoor Solar Radi Direct',
+            "SPACE5-1 Zone People Count"]
+        new_agent.controlled_parameters = {
+            "Zone Heating Setpoint": (14.0, 23.0, 10)}
+
     elif zone_class == "SingleSetpoint,Q,RL":
         new_agent = QNetwork(zone_class)
         new_agent.input_parameters = [
