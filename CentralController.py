@@ -17,7 +17,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         hyper_params = None, episode_number = 0, sqloutput = None,
         extended_logging = False, evaluation_epoch = False,
         add_ou_in_eval_epoch = False,
-        ts_diff_in_min = 5):
+        ts_diff_in_min = 5, rpb = None):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -43,7 +43,8 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     status_output_dict = {}
     #
     # Define the replay ReplayBuffer
-    rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
+    if rpb is None:
+        rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # Lists for command-line outputs
     reward_list = []
@@ -235,7 +236,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         hyper_params = None, episode_number = 0, sqloutput = None,
         extended_logging = False, evaluation_epoch = False,
         add_epsilon_greedy_in_eval_epoch = False,
-        ts_diff_in_min = 5):
+        ts_diff_in_min = 5, rpb = None):
     #
     # define the hyper-parameters
     if hyper_params is None:
@@ -261,7 +262,8 @@ def ddqn_episode_mc(building, building_occ, agents,
     status_output_dict = {}
     #
     # Define the replay ReplayBuffer
-    rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
+    if rpb is None:
+        rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # Define the loss
     loss = torch.nn.MSELoss()
@@ -654,6 +656,10 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                 print(f"Critic {idx} loaded from {load_path}")
 
     #
+    # initialize the replay buffer here, to get it over the episodes
+    rpb = ReplayBufferStd(size=args.rpb_buffer_size, number_agents=len(agents))
+
+    #
     # Set model parameters
     episode_len        = args.episode_length
     episode_start_day  = args.episode_start_day
@@ -688,7 +694,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch,
-                        ts_diff_in_min)
+                        ts_diff_in_min,
+                        rpb)
             status_output_dict["ou_theta"] = ou_theta
             status_output_dict["ou_sigma"] = ou_sigma
             status_output_dict["ou_mu"]    = ou_mu
@@ -710,7 +717,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         (n_episode+1) % args.network_storage_frequency == 0,
                         (n_episode+1) % args.network_storage_frequency == 0,
                         args.add_ou_in_eval_epoch,
-                        ts_diff_in_min)
+                        ts_diff_in_min,
+                        rpb)
             status_output_dict["epsilon"] = epsilon
 
         t_end  = timeit.default_timer()
