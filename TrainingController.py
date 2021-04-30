@@ -21,7 +21,7 @@ from global_paths import global_paths
 if not global_paths["COBS"] in sys.path: sys.path.append( global_paths["COBS"] )
 import cobs
 
-from BuildingOccupancy import BuildingOccupancy
+from BuildingOccupancy import BuildingOccupancyAsMatrix
 import DefaultBuildings
 from CentralController import run_for_n_episodes, one_baseline_episode
 from Options import get_argparser
@@ -68,10 +68,7 @@ def main(args = None):
         args.load_models_episode   = episode_offset - 1
     else:
         # initialize a new building object
-        building_occ = BuildingOccupancy()
-        building_occ.set_room_settings(building.room_names[:-1], {building.room_names[-1]: 40}, 40)
-        building_occ.generate_random_occupants(args.number_occupants)
-        building_occ.generate_random_meetings(15,0)
+        building_occ = BuildingOccupancyAsMatrix(args)
         #
         # save the building_occ object
         f = open(os.path.join(args.checkpoint_dir, "building_occ.pickle"), "wb")

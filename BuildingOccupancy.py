@@ -253,11 +253,12 @@ class BuildingOccupancy:
     
     Parameters
     ----------
-    office_rooms : int or list of string
+    office_rooms : int or list of string or dict
         If rooms is an integer, it will create rooms rooms with the name "OfficeRoom x" for x in range(rooms).
         If romms is a list of strings, it will create the rooms with the given names.
+        If rooms is a dict (Roomname: Max. persons), it will create the rooms with the given names, and the maximum ammount of people inside
         An office room represents a open space office (i.e. bullpen) and a single person office room.
-    conference_rooms : int or list of string
+    conference_rooms : int or dict
         If rooms is an integer, it will create rooms rooms with the name "ConferenceRoom x" for x in range(rooms).
         If romms is a dict (Roomname: Max. persons), it will create the rooms with the given names, and the maximum ammount of people inside.
     """
@@ -268,6 +269,8 @@ class BuildingOccupancy:
         
         if type(office_rooms) == int:
             self.office_rooms = [f"OfficeRoom {x}" for x in range(office_rooms)]
+        elif type(office_rooms) == list:
+            self.office_rooms = {room: conference_rooms_default_max_pers for room in office_rooms}
         else:
             self.office_rooms = office_rooms
 
@@ -298,12 +301,19 @@ class BuildingOccupancy:
         if len(self.occupants) != 0:
             return 0
 
-        pDefaultOff  = np.random.choice(self.office_rooms, number_occupants)
+        # count the number of people inside an office
+        free_people_in_office_room = {room: maxpers - len([pers for pers in self.occupants if pers.default_office == room]) for room, maxpers in self.office_rooms.items()}
         for i in range(number_occupants):
+            if len(free_people_in_office_room.keys()) <= 0:
+                break
+            pDefaultOff = np.random.choice(list(free_people_in_office_room.keys()))
+            free_people_in_office_room[pDefaultOff] -= 1
+            if free_people_in_office_room[pDefaultOff] <= 0:
+                del free_people_in_office_room[pDefaultOff]
             pName       = f"Person {i}"
             pGender     = "m" if np.random.random() < 0.5 else "w"
-            pComfortTemp= np.random.normal(21 if pGender == "w" else 20, 0.65)
-            self.occupants.append(Person( pName, pGender, pDefaultOff[i], pComfortTemp ))
+            pComfortTemp= np.random.normal(21.3 if pGender == "w" else 20.3, 0.4)
+            self.occupants.append(Person( pName, pGender, pDefaultOff, pComfortTemp ))
 
         return number_occupants
 
@@ -339,7 +349,7 @@ class BuildingOccupancy:
         selected_ts_h = np.random.randint(7, 15, number_meetings_per_week)
         selected_ts_m = np.random.randint(0, 60, number_meetings_per_week)
         for n in range(number_meetings_per_week):
-            te_h = np.random.randint(selected_ts_h[n] + 1,
+            te_h = np.random.randint(selected_ts_h[n] + 2,
                                      min(selected_ts_h[n] + 5, 20))
             te_m = np.random.randint(0, 60)
             ts   = datetime.time(selected_ts_h[n], selected_ts_m[n])
@@ -534,11 +544,14 @@ class BuildingOccupancy:
         apply the defined holiday (and bank holiday) settings
     random_absence_ratio : float
         Ratio for the occupants to be not present, although they should be present
+    output_occupants : Boolean
+        Output the people in the rooms as secondary output, not only the sum of occupants
     """
     def draw_sample(self,
                     dto,
                     use_holiday_settings = True,
-                    random_absence_ratio = 0.01):
+                    random_absence_ratio = 0.01,
+                    output_occupants     = False):
 
         if not self._initialized_rooms:
             raise Exception("This building occupancy object is not initialized.")
@@ -556,8 +569,9 @@ class BuildingOccupancy:
             if (dto.month, dto.day) in self.bank_holidays:
                 holiday = True
         # TODO: holiday settings bearbeiten
-        
-        for office_name in self.office_rooms:
+
+        occupant_room_list = {pers: None for pers in self.occupants}
+        for office_name in self.office_rooms.keys():
             comfort_temp_list = []
             number_occup = 0
             if dto.weekday() < 5:
@@ -568,6 +582,7 @@ class BuildingOccupancy:
                     and pers.presence_end > dto.time():
                         number_occup += 1
                         comfort_temp_list.append(pers.comfort_temp)
+                        occupant_room_list[pers] = office_name
             comfort_temp = 0 if len(comfort_temp_list) == 0 else np.mean(comfort_temp_list)
             roomdict[office_name] = {"relative number occupants": number_occup/self.maximal_numer_of_people_in_office_room,
                                      "absolute number occupants": number_occup,
@@ -582,11 +597,14 @@ class BuildingOccupancy:
                     if not pMeeting is None and pMeeting.room == conf_room_name:
                         number_occup += 1
                         comfort_temp_list.append(pers.comfort_temp)
+                        occupant_room_list[pers] = conf_room_name
             comfort_temp = 0 if len(comfort_temp_list) == 0 else np.mean(comfort_temp_list)
             roomdict[conf_room_name] = {"relative number occupants": number_occup/float(maxp),
                                         "absolute number occupants": number_occup,
                                         "mean comfort temp": comfort_temp}
-        
+
+        if output_occupants:
+            return roomdict, occupant_room_list
         return roomdict
 
 
@@ -610,7 +628,7 @@ class BuildingOccupancy:
         no_manual_setp_changes = 0
         changed_magnitude = 0
 
-        for office_name in self.office_rooms:
+        for office_name in self.office_rooms.keys():
             if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
                 temp_values
                 # if the temperature is not in the range [20,24], change the setpoint
@@ -632,5 +650,149 @@ class BuildingOccupancy:
                     changed_magnitude += temp_values[office_name] - 24
 
         return no_manual_setp_changes, changed_magnitude
+
+
+class BuildingOccupancyAsMatrix:
+
+    def __init__(self, args, building):
+        building_occ = BuildingOccupancy()
+        building_occ.set_room_settings({"SPACE5-1":33,"SPACE3-1":17}, {"SPACE1-1":20,"SPACE2-1":10,"SPACE4-1":10})
+        building_occ.generate_random_occupants(args.number_occupants)
+        # mo. 9-12h meeting in Space4-1 with high setpoint (24 deg), 12 people
+        # wen. 13-16h meeting in Space4-1 with low setpoint (20 deg), 12 people (different than on monday)
+        meeting1 = building_occ.add_weekly_meeting("SPACE4-1", 0, datetime.time(hour=9), datetime.time(hour=12))
+        meeting2 = building_occ.add_weekly_meeting("SPACE4-1", 2, datetime.time(hour=9), datetime.time(hour=12))
+        for pers in building_occ.occupants[0:12]:
+            meeting1.add_participant(pers)
+            pers.comfort_temp = 24
+        for pers in building_occ.occupants[12:24]:
+            meeting2.add_participant(pers)
+            pers.comfort_temp = 20
+        # add more random meetings
+        building_occ.generate_random_meetings(5,0)
+        # transform building_occ to a matrix
+        year = 2017
+        month = args.episode_start_month
+        # find first day of the year, that ist the correct day of the week
+        start_day = datetime.date(year, month,1)
+        while start_day.weekday() > 0:
+            start_day += datetime.timedelta(days=1)
+        start_day = start_day.day
+        time_resolution = datetime.timedelta(minutes = 60 // args.ts_per_hour)
+        self.ts_per_hour = args.ts_per_hour
+        #
+        start_dto = datetime.datetime(year, month, start_day)
+        dto       = datetime.datetime(year, month, start_day)
+        occ_lst   = []
+        dto_lst   = []
+        #
+        while (dto - start_dto).days < 7:
+            occ_obj = building_occ.draw_sample(dto, False, 0, True)
+            occ_lst.append( occ_obj[1] )
+            dto_lst.append( occ_obj[0] )
+            dto += time_resolution
+        #
+        number_steps     = len(occ_lst)
+        occupants        = list(occ_lst[0].keys())
+        number_occupants = len(occupants)
+        number_rooms     = len(building.room_names)
+        self.building    = building
+        self.schedule_table = np.zeros(shape=(number_steps, number_occupants, number_rooms))
+        for idx, occ_obj in enumerate(occ_lst):
+            idpers = 0
+            for pers, room in occ_obj.items():
+                if not room is None:
+                    roomid = building.room_names.index(room)
+                    self.schedule_table[idx, idpers, roomid] = 1
+                idpers += 1
+        #
+        self.occupants = np.array([p.comfort_temp for p in building_occ.occupants])
+        self.max_occupants_per_room = self.schedule_table.sum(axis=1).max(axis=0)
+
+    def dto_to_idx(self, dto):
+        """
+        Get the position in time (first axis in self.schedule_table) for a given datetime object
+        """
+        weekday = dto.weekday()
+        hour    = dto.hour
+        minute  = dto.minute
+        return self.ts_per_hour * 24 * weekday + self.ts_per_hour * hour + self.ts_per_hour * minute // 60
+
+    def manual_setpoint_changes(self, dto, temp_values, current_setpoints):
+        """
+        Obtain the number of manual setpoint changes made by the occupants.
+
+        Parameters
+        ----------
+        dto : datetime
+            the date and time for which a the setpoint changes should be calculated
+        temp_values : dict
+            Dictionary containing all current zone temperature values.
+        current_setpoints : dict
+            Dictionary containing all current setpoint values
+
+        Returns the number of manual setpoint changes and some more information
+        """
+        changed_setpoints = {}
+        no_manual_setp_changes = 0
+        changed_magnitude = 0
+        target_temp_per_room = {}
+
+        idx = self.dto_to_idx(dto)
+        selected_schedule_T = self.schedule_table[idx, :, :].T
+        # target temperatures are just the matrix-vector-product
+        # of (Room,Person)-matrix x (Person-Target-Temp)-vector
+        # and than divided by the number of people inside a room
+        people_in_rooms  = self.schedule_table[idx].sum(axis=0)
+        room_target_temp = np.matmul(self.schedule_table[idx].T, self.occupants)
+        room_target_temp = room_target_temp / people_in_rooms.clip(min=1)
+        for idroom, room in enumerate(self.building.room_names):
+            if people_in_rooms[idroom] <= 0:
+                continue
+            current_temp = temp_values[room]
+            diff = np.abs(current_temp - room_target_temp[idroom])
+            if diff > 1.0:
+                no_manual_setp_changes += people_in_rooms[idroom]
+                changed_magnitude += diff
+            target_temp_per_room[room] = room_target_temp[idroom]
+
+        return no_manual_setp_changes, changed_magnitude, target_temp_per_room
+
+    def draw_sample(self,
+                    dto,
+                    use_holiday_settings = True,
+                    random_absence_ratio = 0.01):
+        """
+        Draw a sample for a given day
+        Returns a dictionary containing the room names and the percentage of maximum people inside
+
+        Parameters
+        ----------
+        dto : datetime
+            the date and time for which a sample should be drawn
+        use_holiday_settings : Boolean
+            apply the defined holiday (and bank holiday) settings
+        random_absence_ratio : float
+            Ratio for the occupants to be not present, although they should be present
+        """
+        roomdict = {}
+        holiday = False
+        #if use_holiday_settings:
+        #    if (dto.month, dto.day) in self.bank_holidays:
+        #        holiday = True
+        # TODO: holiday settings bearbeiten
+
+        idx = self.dto_to_idx(dto)
+        people_in_rooms  = self.schedule_table[idx].sum(axis=0)
+        room_target_temp = np.matmul(self.schedule_table[idx].T, self.occupants)
+        room_target_temp = room_target_temp / people_in_rooms.clip(min=1)
+
+        for idroom, room in enumerate(self.building.room_names):
+            roomdict[room] = {"relative number occupants": people_in_rooms[idroom] / float(self.max_occupants_per_room[idroom]),
+                              "absolute number occupants": people_in_rooms[idroom],
+                              "mean comfort temp": room_target_temp[idroom]}
+
+        return roomdict
+
 
 

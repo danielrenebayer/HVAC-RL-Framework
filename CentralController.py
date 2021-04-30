@@ -113,7 +113,7 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
 
         #
         # reward computation
@@ -340,7 +340,7 @@ def ddqn_episode_mc(building, building_occ, agents,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
 
         #
         # reward computation
@@ -569,7 +569,7 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
+        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
 
         #
         # reward computation
