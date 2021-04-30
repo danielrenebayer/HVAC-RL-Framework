@@ -68,7 +68,7 @@ def main(args = None):
         args.load_models_episode   = episode_offset - 1
     else:
         # initialize a new building object
-        building_occ = BuildingOccupancyAsMatrix(args)
+        building_occ = BuildingOccupancyAsMatrix(args, building)
         #
         # save the building_occ object
         f = open(os.path.join(args.checkpoint_dir, "building_occ.pickle"), "wb")

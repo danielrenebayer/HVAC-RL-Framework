@@ -696,7 +696,7 @@ class BuildingOccupancyAsMatrix:
         occupants        = list(occ_lst[0].keys())
         number_occupants = len(occupants)
         number_rooms     = len(building.room_names)
-        self.building    = building
+        self.building_room_names = building.room_names.copy()
         self.schedule_table = np.zeros(shape=(number_steps, number_occupants, number_rooms))
         for idx, occ_obj in enumerate(occ_lst):
             idpers = 0
@@ -746,7 +746,7 @@ class BuildingOccupancyAsMatrix:
         people_in_rooms  = self.schedule_table[idx].sum(axis=0)
         room_target_temp = np.matmul(self.schedule_table[idx].T, self.occupants)
         room_target_temp = room_target_temp / people_in_rooms.clip(min=1)
-        for idroom, room in enumerate(self.building.room_names):
+        for idroom, room in enumerate(self.building_room_names):
             if people_in_rooms[idroom] <= 0:
                 continue
             current_temp = temp_values[room]
@@ -787,7 +787,7 @@ class BuildingOccupancyAsMatrix:
         room_target_temp = np.matmul(self.schedule_table[idx].T, self.occupants)
         room_target_temp = room_target_temp / people_in_rooms.clip(min=1)
 
-        for idroom, room in enumerate(self.building.room_names):
+        for idroom, room in enumerate(self.building_room_names):
             roomdict[room] = {"relative number occupants": people_in_rooms[idroom] / float(self.max_occupants_per_room[idroom]),
                               "absolute number occupants": people_in_rooms[idroom],
                               "mean comfort temp": room_target_temp[idroom]}
