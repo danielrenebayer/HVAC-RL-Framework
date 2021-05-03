@@ -48,6 +48,15 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     #
     # Lists for command-line outputs
     reward_list = []
+    output_loss_list = []
+    output_q_st2_list= []
+    output_J_mean_list=[]
+    output_cr_frobnorm_mat_list = []
+    output_cr_frobnorm_bia_list = []
+    output_ag_frobnorm_mat_list = []
+    output_ag_frobnorm_bia_list = []
+    output_n_stp_ch  = []
+    output_energy_Wh = []
     #
     # prepare the simulation
     state = building.model_reset()
@@ -113,21 +122,24 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
 
         #
         # reward computation
         if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
-            reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+            reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes
         elif hyper_params.reward_function == "rulebased_roomtemp":
-            reward = - reward_fn_rulebased_roomtemp(state, building)
+            reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building)
         #elif hyper_params.reward_function == "rulebased_agent_output":
         else:
-            reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
+            reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
+        reward = -reward
         if not hyper_params is None and hyper_params.log_reward:
             reward = - np.log(-reward + 1)
         # add reward to output list for command-line outputs
         reward_list.append(reward)
+        output_n_stp_ch.append(n_manual_stp_changes)
+        output_energy_Wh.append(current_energy_Wh)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -139,13 +151,6 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
 
         #
         # loop over all [agent, critic]-pairs
-        output_loss_list = []
-        output_q_st2_list= []
-        output_J_mean_list=[]
-        output_cr_frobnorm_mat_list = []
-        output_cr_frobnorm_bia_list = []
-        output_ag_frobnorm_mat_list = []
-        output_ag_frobnorm_bia_list = []
         for agent, critic in zip(agents, critics):
             #
             # compute y
@@ -188,12 +193,6 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
             output_ag_frobnorm_mat_list.append( ag_fnorm1 )
             output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
-
-        #
-        # store losses in the loss list
-        if not sqloutput is None:
-            sqloutput.add_every_step_of_episode( locals() )
-
         #
         # store detailed output, if extended logging is selected
         if extended_logging and not sqloutput is None:
@@ -225,8 +224,18 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
     status_output_dict["reward_mean"] = np.mean(reward_list)
     status_output_dict["reward_sum"]  = np.sum(reward_list)
+    status_output_dict["mean_manual_stp_ch_n"]   = np.mean(output_n_stp_ch)
+    status_output_dict["current_energy_Wh_mean"] = np.mean(output_energy_Wh)
+    status_output_dict["current_energy_Wh_sum"]  = np.sum(output_energy_Wh)
     status_output_dict["evaluation_epoch"] = evaluation_epoch
     status_output_dict["random_process_addition"] = add_ou_process
+    status_output_dict["loss_mean"] = np.mean(output_loss_list)
+    status_output_dict["q_st2_mean"] = np.mean(output_q_st2_list)
+    status_output_dict["J_mean"] = np.mean(output_J_mean_list)
+    status_output_dict["frobnorm_agent_matr_mean"] = np.mean(output_ag_frobnorm_mat_list)
+    status_output_dict["frobnorm_agent_bias_mean"] = np.mean(output_ag_frobnorm_bia_list)
+    status_output_dict["frobnorm_critic_matr_mean"] = np.mean(output_cr_frobnorm_mat_list)
+    status_output_dict["frobnorm_critic_bias_mean"] = np.mean(output_cr_frobnorm_bia_list)
     return status_output_dict
 
 
@@ -270,6 +279,15 @@ def ddqn_episode_mc(building, building_occ, agents,
     #
     # Lists for command-line outputs
     reward_list = []
+    output_loss_list = []
+    output_q_st2_list= [0 for _ in agents]
+    output_J_mean_list=[0 for _ in agents]
+    output_cr_frobnorm_mat_list = [0 for _ in agents]
+    output_cr_frobnorm_bia_list = [0 for _ in agents]
+    output_ag_frobnorm_mat_list = []
+    output_ag_frobnorm_bia_list = []
+    output_n_stp_ch  = []
+    output_energy_Wh = []
     #
     # prepare the simulation
     state = building.model_reset()
@@ -340,21 +358,24 @@ def ddqn_episode_mc(building, building_occ, agents,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
 
         #
         # reward computation
         if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
-            reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
+            reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes
         elif hyper_params.reward_function == "rulebased_roomtemp":
-            reward = - reward_fn_rulebased_roomtemp(state, building)
+            reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building)
         #elif hyper_params.reward_function == "rulebased_agent_output":
         else:
-            reward = - reward_fn_rulebased_agent_output(state, agent_actions_dict)
+            reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
+        reward = -reward
         if not hyper_params is None and hyper_params.log_reward:
             reward = - np.log(-reward + 1)
         # add reward to output list for command-line outputs
         reward_list.append(reward)
+        output_n_stp_ch.append(n_manual_stp_changes)
+        output_energy_Wh.append(current_energy_Wh)
 
         #
         # save (last_state, actions, reward, state) to replay buffer
@@ -367,13 +388,6 @@ def ddqn_episode_mc(building, building_occ, agents,
 
         #
         # loop over all [agent, critic]-pairs
-        output_loss_list = []
-        output_q_st2_list= [0 for _ in agents]
-        output_J_mean_list=[0 for _ in agents]
-        output_cr_frobnorm_mat_list = [0 for _ in agents]
-        output_cr_frobnorm_bia_list = [0 for _ in agents]
-        output_ag_frobnorm_mat_list = []
-        output_ag_frobnorm_bia_list = []
         if agents[0].shared_network_per_agent_class:
             #
             # compute y (i.e. the TD-target)
@@ -423,11 +437,6 @@ def ddqn_episode_mc(building, building_occ, agents,
             output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
         #
-        # store losses in the loss list
-        if not sqloutput is None:
-            sqloutput.add_every_step_of_episode( locals() )
-
-        #
         # store detailed output, if extended logging is selected
         if extended_logging and not sqloutput is None:
             sqloutput.add_every_step_of_some_episodes( locals() )
@@ -457,8 +466,14 @@ def ddqn_episode_mc(building, building_occ, agents,
     status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
     status_output_dict["reward_mean"] = np.mean(reward_list)
     status_output_dict["reward_sum"]  = np.sum(reward_list)
+    status_output_dict["mean_manual_stp_ch_n"]   = np.mean(output_n_stp_ch)
+    status_output_dict["current_energy_Wh_mean"] = np.mean(output_energy_Wh)
+    status_output_dict["current_energy_Wh_sum"]  = np.sum(output_energy_Wh)
     status_output_dict["evaluation_epoch"] = evaluation_epoch
     status_output_dict["random_process_addition"] = add_random_process
+    status_output_dict["loss_mean"] = np.mean(output_loss_list)
+    status_output_dict["frobnorm_agent_matr_mean"] = np.mean(output_ag_frobnorm_mat_list)
+    status_output_dict["frobnorm_agent_bias_mean"] = np.mean(output_ag_frobnorm_bia_list)
     return status_output_dict
 
 
@@ -569,16 +584,11 @@ def one_baseline_episode(building, building_occ, args, sqloutput = None):
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, _ = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
+        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
 
         #
         # reward computation
         reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
-
-        #
-        # store losses in the loss list
-        if not sqloutput is None:
-            sqloutput.add_every_step_of_episode( locals(), ignore_agents = True )
 
         #
         # store detailed output
@@ -755,25 +765,28 @@ def reward_fn_rulebased_roomtemp(state, building):
     changed_magnitude = 0
     dto = state['time']
     temp_values = state['temperature']
+    target_temp_per_room = {}
     for room in building.room_names:
         if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
-            # if the temperature is not in the range [21,23.5], change the setpoint
+            # if the temperature is not in the range [21.0,23.0], change the setpoint
+            target_temp_per_room[room] = 22.0
             if temp_values[room] < 21.0:
                 changed_magnitude += 21.0 - temp_values[room]
             elif temp_values[room] > 23.5:
                 changed_magnitude += temp_values[room] - 23.5
         else:
-            # if the temperature is not in the range [15,17], change the setpoint
+            # if the temperature is not in the range [15.0,17.0], change the setpoint
+            target_temp_per_room[room] = 16.0
             if temp_values[room] < 15:
                 changed_magnitude += 15 - temp_values[room]
             elif temp_values[room] > 17:
                 changed_magnitude += temp_values[room] - 17
-    return changed_magnitude
+    return changed_magnitude, target_temp_per_room
 
 
 
 
-def reward_fn_rulebased_agent_output(state, agent_actions_dict):
+def reward_fn_rulebased_agent_output(state, agent_actions_dict, building):
     """
     This is another alternative reward function.
     It loops over all agents, returning a (positiv) reward, iff the agent-computed heating setpoint is out of a given band.
@@ -781,24 +794,29 @@ def reward_fn_rulebased_agent_output(state, agent_actions_dict):
     """
     changed_magnitude = 0
     dto = state['time']
+    target_temp_per_room = {}
     for agent, agent_actions in agent_actions_dict.items():
         if "Zone Heating/Cooling-Mean Setpoint" in agent_actions.keys():
             agent_heating_setpoint = agent_actions["Zone Heating/Cooling-Mean Setpoint"] - agent_actions["Zone Heating/Cooling-Delta Setpoint"]
         else:
             agent_heating_setpoint = agent_actions["Zone Heating Setpoint"]
         if dto.weekday() < 5 and dto.hour >= 7 and dto.hour < 18:
-            # if the temperature is not in the range [21,23.5], change the setpoint
+            # if the temperature is not in the range [21.0,23.0], change the setpoint
+            for room in building.room_names:
+                target_temp_per_room[room] = 22.0
             if agent_heating_setpoint < 21.0:
                 changed_magnitude += 21.0 - agent_heating_setpoint
             elif agent_heating_setpoint > 23.5:
                 changed_magnitude += agent_heating_setpoint - 23.5
         else:
             # if the temperature is not in the range [15,17], change the setpoint
+            for room in building.room_names:
+                target_temp_per_room[room] = 22.0
             if agent_heating_setpoint < 15:
                 changed_magnitude += 15 - agent_heating_setpoint
             elif agent_heating_setpoint > 17:
                 changed_magnitude += agent_heating_setpoint - 17
-    return changed_magnitude
+    return changed_magnitude, target_temp_per_room
 
 
 

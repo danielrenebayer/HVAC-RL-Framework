@@ -14,29 +14,6 @@ class SQLOutput():
         # all output dictionaries have the same format:
         # database table name: [database column type, local variable name in code]
         #
-        # output vars every episode, every step
-        self.output_vars_eees = {
-            "episode": ["integer", "episode_number"],
-            "step":    ["integer", "timestep"],
-            "reward":  ["float",   "reward"],
-            "manual_stp_ch_n":   ["float", "n_manual_stp_changes"],
-            #"manual_stp_ch_mag": ["integer", "mag_manual_stp_changes"],
-            "energy_Wh":  ["float",   "current_energy_Wh"]
-        }
-
-        # output vars every episode, every step, every agent
-        self.output_vars_eeesea = {
-            "episode":  ["integer", "episode_number"],
-            "step":     ["integer", "timestep"],
-            "agent_nr": ["integer", None],
-            "loss":     ["float",   "output_loss_list"],
-            "q_st2":    ["float",   "output_q_st2_list"],
-            "J":        ["float",   "output_J_mean_list"],
-            "frobnorm_agent_matr": ["float", "output_ag_frobnorm_mat_list"],
-            "frobnorm_agent_bias": ["float", "output_ag_frobnorm_bia_list"],
-            "frobnorm_critic_matr":["float", "output_cr_frobnorm_mat_list"],
-            "frobnorm_critic_bias":["float", "output_cr_frobnorm_bia_list"]
-        }
 
         # output vars every episode at the end accumulated or somehow aggreated
         self.output_vars_eels = {
@@ -52,7 +29,20 @@ class SQLOutput():
             "time_cons":["float",   "t_diff"],
             "target_netw_u":  ["boolean", "target_network_update"],
             "eval_epoch":     ["boolean", "evaluation_epoch"],
-            "random_process_addition": ["boolean","random_process_addition"]
+            "random_process_addition": ["boolean","random_process_addition"],
+            "mean_manual_stp_ch_n": ["float", "mean_manual_stp_ch_n"],
+            "mean_reward": ["float", "reward_mean"],
+            "sum_reward":  ["float", "reward_sum"],
+            "mean_energy_Wh":   ["float", "current_energy_Wh_mean"],
+            "sum_energy_Wh":    ["float", "current_energy_Wh_sum"],
+            # informations about the agents
+            "loss_mean": ["float",   "loss_mean"],
+            "q_st2_mean":["float",   "q_st2_mean"],
+            "J_mean":    ["float",   "J_mean"],
+            "frobnorm_agent_matr_mean": ["float", "frobnorm_agent_matr_mean"],
+            "frobnorm_agent_bias_mean": ["float", "frobnorm_agent_bias_mean"],
+            "frobnorm_critic_matr_mean":["float", "frobnorm_critic_matr_mean"],
+            "frobnorm_critic_bias_mean":["float", "frobnorm_critic_bias_mean"]
         }
 
         # output vars after some episodes, but every step
@@ -60,6 +50,9 @@ class SQLOutput():
             "episode":  ["integer", "episode_number"],
             "step":     ["integer", "timestep"],
             "datetime": ["string",  "currdate"],
+            "reward":   ["float",   "reward"],
+            "manual_stp_ch_n":  ["float", "n_manual_stp_changes"],
+            "energy_Wh":        ["float", "current_energy_Wh"],
             # these can be found in the state dict
             "outdoor_temp":       ["float", "Outdoor Air Temperature"],
             "outdoor_humidity":   ["float", "Outdoor Air Humidity"],
@@ -73,11 +66,12 @@ class SQLOutput():
         self.output_vars_sees_er = {
             "episode":  ["integer", "episode_number"],
             "step":     ["integer", "timestep"],
-            "room":     ["integer", None],
+            "room":     ["string",  None],
             "temp":     ["float",   "Zone Temperature"],
             "occupancy":["integer", "Zone People Count"],
             "co2":      ["float",   "Zone CO2"],
-            "humidity": ["float",   "Zone Relative Humidity"]
+            "humidity": ["float",   "Zone Relative Humidity"],
+            "target_temp": ["float", "target_temp_per_room"]
         }
 
         # output vars after some episodes, but every step, every agent
@@ -94,19 +88,17 @@ class SQLOutput():
         Initializes the database and this object
         """
         # initialize the database
-        for table in ["eees", "eeesea", "eels", "sees", "seesea", "sees_er"]:
+        for table in ["eels", "sees", "seesea", "sees_er"]:
             self.db.execute( self.get_sql_create_statement(table) )
 
 
     def get_sql_create_statement(self, vartype):
         """
         Returns a SQL CREATE TABLE string for creating the table for `vartype`.
-        `vartype` should be out of the list: [eees, eeesea, eels, sees, seesea, sees_er]
+        `vartype` should be out of the list: [eels, sees, seesea, sees_er]
         """
         outputstr = f"CREATE TABLE {vartype}("
-        vardict = {"eees":   self.output_vars_eees,
-                   "eeesea": self.output_vars_eeesea,
-                   "eels":   self.output_vars_eels,
+        vardict = {"eels":   self.output_vars_eels,
                    "sees":   self.output_vars_sees,
                    "seesea": self.output_vars_seesea,
                    "sees_er":self.output_vars_sees_er}[vartype]
@@ -181,11 +173,16 @@ class SQLOutput():
             for colname, (_, lvarname) in self.output_vars_sees_er.items():
                 if lvarname is None:
                     if colname == "room":
-                        dict_for_db[colname] = idx
+                        dict_for_db[colname] = room
                     else:
                         continue
                 elif colname == "episode" or colname == "step":
                     dict_for_db[colname] = local_vars[lvarname]
+                elif colname == "target_temp":
+                    if room in local_vars["target_temp_per_room"].keys():
+                        dict_for_db[colname] = local_vars["target_temp_per_room"][room]
+                    else:
+                        dict_for_db[colname] = 0
                 else:
                     dict_for_db[colname] = local_vars["state"][f"{room} {lvarname}"]
             self._propagate_to_db("sees_er", dict_for_db)
