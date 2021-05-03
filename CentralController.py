@@ -318,6 +318,7 @@ def one_single_episode(algorithm,
     status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
     status_output_dict["reward_mean"] = np.mean(reward_list)
     status_output_dict["reward_sum"]  = np.sum(reward_list)
+    status_output_dict["sum_manual_stp_ch_n"]    = np.sum(output_n_stp_ch)
     status_output_dict["mean_manual_stp_ch_n"]   = np.mean(output_n_stp_ch)
     status_output_dict["current_energy_Wh_mean"] = np.mean(output_energy_Wh)
     status_output_dict["current_energy_Wh_sum"]  = np.sum(output_energy_Wh)

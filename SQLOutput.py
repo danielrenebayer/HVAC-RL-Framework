@@ -30,6 +30,7 @@ class SQLOutput():
             "target_netw_u":  ["boolean", "target_network_update"],
             "eval_epoch":     ["boolean", "evaluation_epoch"],
             "random_process_addition": ["boolean","random_process_addition"],
+            "sum_manual_stp_ch_n":  ["float", "sum_manual_stp_ch_n"],
             "mean_manual_stp_ch_n": ["float", "mean_manual_stp_ch_n"],
             "mean_reward": ["float", "reward_mean"],
             "sum_reward":  ["float", "reward_sum"],
