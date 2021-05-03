@@ -791,6 +791,8 @@ class BuildingOccupancyAsMatrix:
             maxp = self.max_occupants_per_room[idroom]
             if type(maxp) == int:
                 maxp = float(maxp)
+            if maxp <= 0:
+                maxp = 1.0
             roomdict[room] = {"relative number occupants": people_in_rooms[idroom] / maxp,
                               "absolute number occupants": people_in_rooms[idroom],
                               "mean comfort temp": room_target_temp[idroom]}
