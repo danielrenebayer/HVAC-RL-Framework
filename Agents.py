@@ -751,7 +751,8 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
     def __init__(self):
         super().__init__("VAV with Reheat,Heating,Cooling,NoRL")
 
-    def initialize(self, name, controlled_element, args = None):
+    def initialize(self, name, controlled_element, args = None,
+            global_state_keys = None, load_path = "", load_prefix = ""):
         self.name = name
         self.controlled_element = controlled_element
         if args == None:

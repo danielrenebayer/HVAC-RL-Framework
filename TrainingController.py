@@ -23,7 +23,7 @@ import cobs
 
 from BuildingOccupancy import BuildingOccupancyAsMatrix
 import DefaultBuildings
-from CentralController import run_for_n_episodes, one_baseline_episode
+from CentralController import run_for_n_episodes
 from Options import get_argparser
 from SQLOutput import SQLOutput
 
@@ -91,15 +91,8 @@ def main(args = None):
 
     #
     # call the controlling function
-    if args.algorithm == "rule-based":
-        # run one sample episode using the rule-based agent
-        outputs = one_baseline_episode(building, building_occ, args, sqloutput)
-        f = open(os.path.join(args.checkpoint_dir, "complete_outputs.pickle"), "wb")
-        pickle.dump(outputs, f)
-        f.close()
-    else:
-        # run the model for n episodes
-        run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput, episode_offset)
+    # run the model for n episodes
+    run_for_n_episodes(args.episodes_count, building, building_occ, args, sqloutput, episode_offset)
 
     sqloutput.db.commit()
     sqloutput.db.close()

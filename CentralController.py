@@ -13,10 +13,12 @@ import StateUtilities as SU
 from Agents import agent_constructor
 import RLCritics
 
-def ddpg_episode_mc(building, building_occ, agents, critics,
+def one_single_episode(algorithm,
+        building, building_occ,
+        agents = None, critics = None,
         hyper_params = None, episode_number = 0, sqloutput = None,
-        extended_logging = False, evaluation_epoch = False,
-        add_ou_in_eval_epoch = False,
+        extended_logging = False, evaluation_episode = False,
+        add_random_process_in_eval_epoch = False,
         ts_diff_in_min = 5, rpb = None):
     #
     # define the hyper-parameters
@@ -45,6 +47,9 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     # Define the replay ReplayBuffer
     if rpb is None:
         rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
+    #
+    # Define the loss for DDQN
+    loss = torch.nn.MSELoss()
     #
     # Lists for command-line outputs
     reward_list = []
@@ -57,237 +62,15 @@ def ddpg_episode_mc(building, building_occ, agents, critics,
     output_ag_frobnorm_bia_list = []
     output_n_stp_ch  = []
     output_energy_Wh = []
-    #
-    # prepare the simulation
-    state = building.model_reset()
-    SU.fix_year_confussion(state)
-    norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
-    #
-    current_occupancy = building_occ.draw_sample( state["time"] )
-    timestep   = 0
-    last_state = None
-    # start the simulation loop
-    while not building.model_is_terminate():
-        actions = list()
-        
-        currdate = state['time']
-        #
-        # request occupancy for the next state
-        nextdate = state['time'] + datetime.timedelta(minutes=ts_diff_in_min)
-        next_occupancy = building_occ.draw_sample(nextdate)
-        #
-        # propagate occupancy values to COBS / EnergyPlus
-        for zonename, occd in next_occupancy.items():
-            actions.append({"priority":        0,
-                            "component_type": "Schedule:Constant",
-                            "control_type":   "Schedule Value",
-                            "actuator_key":  f"OCC-SCHEDULE-{zonename}",
-                            "value":           next_occupancy[zonename]["relative number occupants"],
-                            "start_time":      state['timestep'] + 1})
-
-        #
-        # request new actions from all agents
-        agent_actions_dict = {}
-        agent_actions_list = []
-        for agent in agents:
-            add_ou_process = True
-            if evaluation_epoch and not add_ou_in_eval_epoch:
-                add_ou_process = False
-            new_action = agent.step_tensor(norm_state_ten,
-                                           use_actor = True,
-                                           add_ou    = add_ou_process)
-            agent_actions_list.append( new_action )
-            new_action_dict = agent.output_tensor_to_action_dict(new_action)
-            agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
-
-        #
-        # send agent actions to the building object and obtaion the actions for COBS/eplus
-        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
-
-        #
-        # send actions to EnergyPlus and obtian the new state
-        norm_state_ten_last = norm_state_ten
-        last_state = state
-        timestep  += 1
-        state      = building.model_step(actions)
-        current_occupancy = next_occupancy
-        SU.fix_year_confussion(state)
-
-        current_energy_Wh = state["energy"] / 360
-
-        #
-        # modify state
-        norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
-
-        #
-        # send current temp/humidity values for all rooms
-        # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
-
-        #
-        # reward computation
-        if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
-            reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes
-        elif hyper_params.reward_function == "rulebased_roomtemp":
-            reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building)
-        #elif hyper_params.reward_function == "rulebased_agent_output":
-        else:
-            reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
-        reward = -reward
-        if not hyper_params is None and hyper_params.log_reward:
-            reward = - np.log(-reward + 1)
-        # add reward to output list for command-line outputs
-        reward_list.append(reward)
-        output_n_stp_ch.append(n_manual_stp_changes)
-        output_energy_Wh.append(current_energy_Wh)
-
-        #
-        # save (last_state, actions, reward, state) to replay buffer
-        rpb.add_transition(norm_state_ten_last, agent_actions_list, reward, norm_state_ten)
-
-        #
-        # sample minibatch
-        b_state1, b_action, b_action_cat, b_reward, b_state2 = rpb.sample_minibatch(BATCH_SIZE)
-
-        #
-        # loop over all [agent, critic]-pairs
-        for agent, critic in zip(agents, critics):
-            #
-            # compute y
-            #  Hint: s_{i+1} <- state2; s_i <- state1
-            critic.model.zero_grad()
-            #  1. compute mu'(s_{i+1})
-            mu_list = [ aInnerLoop.step_tensor(b_state2, use_actor = False) for aInnerLoop in agents ]
-            #  2. compute y
-            q_st2 = critic.forward_tensor(b_state2, mu_list, no_target = False)
-            y     = b_reward.detach() + DISCOUNT_FACTOR * q_st2
-            # compute Q for state1
-            q = critic.forward_tensor(b_state1, b_action_cat, no_target = True)
-            # update critic by minimizing the loss L
-            L = critic.compute_loss_and_optimize(q, y, no_backprop = evaluation_epoch)
-            #
-            # update actor policies
-            # policy loss = J
-            mu_list = [ aInnerLoop.step_tensor(b_state1, add_ou = False) for aInnerLoop in agents ]
-            agent.model_actor.zero_grad()
-            policy_J = -critic.forward_tensor(b_state1, mu_list)
-            policy_J_mean = policy_J.mean()
-            if not evaluation_epoch:
-                policy_J_mean.backward()
-                agent.optimizer_step()
-            #
-            # save outputs
-            output_loss_list.append(float(L.detach().numpy()))
-            output_q_st2_list.append(float(q_st2.detach().mean().numpy()))
-            output_J_mean_list.append(float(policy_J_mean.detach().numpy()))
-            # compute and store frobenius norms for the weights
-            cr_fnorm1, cr_fnorm2, ag_fnorm1, ag_fnorm2 = 0, 0, 0, 0
-            for p in critic.model.parameters():
-                if len(p.shape) == 1: cr_fnorm2 += float(p.cpu().norm().detach().cpu().numpy())
-                else: cr_fnorm1 += float(p.norm().detach().cpu().numpy())
-            for p in agent.model_actor.parameters():
-                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
-                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
-            output_cr_frobnorm_mat_list.append( cr_fnorm1 )
-            output_cr_frobnorm_bia_list.append( cr_fnorm2 )
-            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
-            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
-
-        #
-        # store detailed output, if extended logging is selected
-        if extended_logging and not sqloutput is None:
-            sqloutput.add_every_step_of_some_episodes( locals() )
-
-        if timestep % 200 == 0:
-            eval_ep_str     = "  " if evaluation_epoch   else "no"
-            rand_pr_add_str = "  " if add_ou_process     else "no"
-            print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.")
-
-    #
-    # update target networks
-    status_output_dict["target_network_update"] = False
-    if episode_number % TARGET_NETWORK_UPDATE_FREQ == 0:
-        # update target critic
-        for critic in critics:
-            critic.update_target_network(TAU_TARGET_NETWORKS)
-        # update target network for actor
-        for agent in agents:
-            agent.update_target_network(TAU_TARGET_NETWORKS)
-        status_output_dict["target_network_update"] = True
-
-    #
-    # status output dict postprocessing
-    status_output_dict["episode"]     = episode_number
-    status_output_dict["lr"]          = LEARNING_RATE
-    status_output_dict["tau"]         = TAU_TARGET_NETWORKS
-    status_output_dict["lambda_energy"] = LAMBDA_REWARD_ENERGY
-    status_output_dict["lambda_manu_stp"] = LAMBDA_REWARD_MANU_STP_CHANGES
-    status_output_dict["reward_mean"] = np.mean(reward_list)
-    status_output_dict["reward_sum"]  = np.sum(reward_list)
-    status_output_dict["mean_manual_stp_ch_n"]   = np.mean(output_n_stp_ch)
-    status_output_dict["current_energy_Wh_mean"] = np.mean(output_energy_Wh)
-    status_output_dict["current_energy_Wh_sum"]  = np.sum(output_energy_Wh)
-    status_output_dict["evaluation_epoch"] = evaluation_epoch
-    status_output_dict["random_process_addition"] = add_ou_process
-    status_output_dict["loss_mean"] = np.mean(output_loss_list)
-    status_output_dict["q_st2_mean"] = np.mean(output_q_st2_list)
-    status_output_dict["J_mean"] = np.mean(output_J_mean_list)
-    status_output_dict["frobnorm_agent_matr_mean"] = np.mean(output_ag_frobnorm_mat_list)
-    status_output_dict["frobnorm_agent_bias_mean"] = np.mean(output_ag_frobnorm_bia_list)
-    status_output_dict["frobnorm_critic_matr_mean"] = np.mean(output_cr_frobnorm_mat_list)
-    status_output_dict["frobnorm_critic_bias_mean"] = np.mean(output_cr_frobnorm_bia_list)
-    return status_output_dict
-
-
-
-
-def ddqn_episode_mc(building, building_occ, agents,
-        hyper_params = None, episode_number = 0, sqloutput = None,
-        extended_logging = False, evaluation_epoch = False,
-        add_epsilon_greedy_in_eval_epoch = False,
-        ts_diff_in_min = 5, rpb = None):
-    #
-    # define the hyper-parameters
-    if hyper_params is None:
-        LAMBDA_REWARD_ENERGY = 0.1
-        LAMBDA_REWARD_MANU_STP_CHANGES = 150
-        TAU_TARGET_NETWORKS = 0.01
-        DISCOUNT_FACTOR = 0.9
-        BATCH_SIZE = 128
-        RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
-        LEARNING_RATE = 0.01
-        TARGET_NETWORK_UPDATE_FREQ = 3
-    else:
-        LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
-        LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
-        TAU_TARGET_NETWORKS  = hyper_params.tau
-        DISCOUNT_FACTOR = hyper_params.discount_factor
-        BATCH_SIZE      = hyper_params.batch_size
-        RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
-        LEARNING_RATE   = hyper_params.lr
-        TARGET_NETWORK_UPDATE_FREQ = hyper_params.target_network_update_freq
-    #
-    # define the output dict containing status informations
-    status_output_dict = {}
-    #
-    # Define the replay ReplayBuffer
-    if rpb is None:
-        rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
-    #
-    # Define the loss
-    loss = torch.nn.MSELoss()
-    #
-    # Lists for command-line outputs
-    reward_list = []
-    output_loss_list = []
-    output_q_st2_list= [0 for _ in agents]
-    output_J_mean_list=[0 for _ in agents]
-    output_cr_frobnorm_mat_list = [0 for _ in agents]
-    output_cr_frobnorm_bia_list = [0 for _ in agents]
-    output_ag_frobnorm_mat_list = []
-    output_ag_frobnorm_bia_list = []
-    output_n_stp_ch  = []
-    output_energy_Wh = []
+    if not algorithm == "ddpg":
+        output_q_st2_list= [0 for _ in agents]
+        output_J_mean_list=[0 for _ in agents]
+        output_cr_frobnorm_mat_list = [0 for _ in agents]
+        output_cr_frobnorm_bia_list = [0 for _ in agents]
+    if algorithm == "baseline_rule-based":
+        output_loss_list = [0]
+        output_ag_frobnorm_mat_list = [0]
+        output_ag_frobnorm_bia_list = [0]
     #
     # prepare the simulation
     state = building.model_reset()
@@ -321,20 +104,35 @@ def ddqn_episode_mc(building, building_occ, agents,
         agent_actions_dict = {}
         agent_actions_list = []
         add_random_process = True
-        if evaluation_epoch and not add_epsilon_greedy_in_eval_epoch:
+        if evaluation_episode and not add_random_process_in_eval_epoch:
             add_random_process = False
-        if agents[0].shared_network_per_agent_class:
-            new_actions = agents[0].next_action(norm_state_ten, add_random_process)
-            agent_actions_list = new_actions
-            # decode the actions for every agent using the individual agent objects
-            for idx, agent in enumerate(agents):
-                agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_actions[idx])
-        else:
-            for agent in agents:
-                new_action = agent.next_action(norm_state_ten, add_random_process)
-                agent_actions_list.append( new_action )
-                agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
+
+        if algorithm == "ddqn":
+            if agents[0].shared_network_per_agent_class:
+                new_actions = agents[0].next_action(norm_state_ten, add_random_process)
+                agent_actions_list = new_actions
+                # decode the actions for every agent using the individual agent objects
+                for idx, agent in enumerate(agents):
+                    agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_actions[idx])
+            else:
+                for agent in agents:
+                    new_action = agent.next_action(norm_state_ten, add_random_process)
+                    agent_actions_list.append( new_action )
+                    agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
             # no backtransformation of variables needed, this is done in agents definition already
+
+        elif algorithm == "ddpg":
+            for agent in agents:
+                new_action = agent.step_tensor(norm_state_ten,
+                                               use_actor = True,
+                                               add_ou    = add_ou_process)
+                agent_actions_list.append( new_action )
+                new_action_dict = agent.output_tensor_to_action_dict(new_action)
+                agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
+
+        elif algorithm == "baseline_rule-based":
+            for agent in agents:
+                agent_actions_dict[agent.name] = agent.step(state)
 
         #
         # send agent actions to the building object and obtaion the actions for COBS/eplus
@@ -382,80 +180,134 @@ def ddqn_episode_mc(building, building_occ, agents,
         rpb.add_transition(norm_state_ten_last, agent_actions_list, reward, norm_state_ten)
 
         #
-        # sample minibatch
-        b_state1, b_action, b_reward, b_state2 = rpb.sample_minibatch(BATCH_SIZE, False)
-        b_action = torch.tensor(b_action)
+        if algorithm == "ddqn":
+            # sample minibatch
+            b_state1, b_action, b_reward, b_state2 = rpb.sample_minibatch(BATCH_SIZE, False)
+            b_action = torch.tensor(b_action)
+            #
+            # loop over all [agent, critic]-pairs
+            if agents[0].shared_network_per_agent_class:
+                #
+                # compute y (i.e. the TD-target)
+                #  Hint: s_{i+1} <- state2; s_i <- state1
+                agents[0].model_actor.zero_grad()
+                b_reward = b_reward.detach().expand(-1, len(agents) ).flatten()[:, np.newaxis]
+                # wrong: b_reward = b_reward.detach().repeat(len(agents), 1)
+                y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+                # compute Q for state1
+                q = agents[0].step_tensor(b_state1, use_actor = True).gather(1, b_action.flatten()[:, np.newaxis])
+                # update agent by minimizing the loss L
+                L = loss(q, y)
+                L.backward()
+                agents[0].optimizer_step()
+                #
+                # save outputs
+                output_loss_list.append(float(L.detach().numpy()))
+                # compute and store frobenius norms for the weights
+                ag_fnorm1, ag_fnorm2 = 0, 0
+                for p in agents[0].model_actor.parameters():
+                    if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                    else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+                output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+                output_ag_frobnorm_bia_list.append( ag_fnorm2 )
+            else:
+                for agent_id, agent in enumerate(agents):
+                    #
+                    # compute y (i.e. the TD-target)
+                    #  Hint: s_{i+1} <- state2; s_i <- state1
+                    agent.model_actor.zero_grad()
+                    y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+                    # compute Q for state1
+                    q = agent.step_tensor(b_state1, use_actor = True).gather(1, b_action[:, agent_id][:, np.newaxis])
+                    # update agent by minimizing the loss L
+                    L = loss(q, y)
+                    L.backward()
+                    agent.optimizer_step()
+                    #
+                    # save outputs
+                    output_loss_list.append(float(L.detach().numpy()))
+                    # compute and store frobenius norms for the weights
+                    ag_fnorm1, ag_fnorm2 = 0, 0
+                    for p in agent.model_actor.parameters():
+                        if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                        else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+                    output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+                    output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
-        #
-        # loop over all [agent, critic]-pairs
-        if agents[0].shared_network_per_agent_class:
+
+        elif algorithm == "ddpg":
+            # sample minibatch
+            b_state1, b_action, b_action_cat, b_reward, b_state2 = rpb.sample_minibatch(BATCH_SIZE)
             #
-            # compute y (i.e. the TD-target)
-            #  Hint: s_{i+1} <- state2; s_i <- state1
-            agents[0].model_actor.zero_grad()
-            b_reward = b_reward.detach().expand(-1, len(agents) ).flatten()[:, np.newaxis]
-            # wrong: b_reward = b_reward.detach().repeat(len(agents), 1)
-            y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
-            # compute Q for state1
-            q = agents[0].step_tensor(b_state1, use_actor = True).gather(1, b_action.flatten()[:, np.newaxis])
-            # update agent by minimizing the loss L
-            L = loss(q, y)
-            L.backward()
-            agents[0].optimizer_step()
-            #
-            # save outputs
-            output_loss_list.append(float(L.detach().numpy()))
-            # compute and store frobenius norms for the weights
-            ag_fnorm1, ag_fnorm2 = 0, 0
-            for p in agents[0].model_actor.parameters():
-                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
-                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
-            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
-            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
-        else:
-          for agent_id, agent in enumerate(agents):
-            #
-            # compute y (i.e. the TD-target)
-            #  Hint: s_{i+1} <- state2; s_i <- state1
-            agent.model_actor.zero_grad()
-            y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
-            # compute Q for state1
-            q = agent.step_tensor(b_state1, use_actor = True).gather(1, b_action[:, agent_id][:, np.newaxis])
-            # update agent by minimizing the loss L
-            L = loss(q, y)
-            L.backward()
-            agent.optimizer_step()
-            #
-            # save outputs
-            output_loss_list.append(float(L.detach().numpy()))
-            # compute and store frobenius norms for the weights
-            ag_fnorm1, ag_fnorm2 = 0, 0
-            for p in agent.model_actor.parameters():
-                if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
-                else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
-            output_ag_frobnorm_mat_list.append( ag_fnorm1 )
-            output_ag_frobnorm_bia_list.append( ag_fnorm2 )
+            # loop over all [agent, critic]-pairs
+            for agent, critic in zip(agents, critics):
+                #
+                # compute y
+                #  Hint: s_{i+1} <- state2; s_i <- state1
+                critic.model.zero_grad()
+                #  1. compute mu'(s_{i+1})
+                mu_list = [ aInnerLoop.step_tensor(b_state2, use_actor = False) for aInnerLoop in agents ]
+                #  2. compute y
+                q_st2 = critic.forward_tensor(b_state2, mu_list, no_target = False)
+                y     = b_reward.detach() + DISCOUNT_FACTOR * q_st2
+                # compute Q for state1
+                q = critic.forward_tensor(b_state1, b_action_cat, no_target = True)
+                # update critic by minimizing the loss L
+                L = critic.compute_loss_and_optimize(q, y, no_backprop = evaluation_episode)
+                #
+                # update actor policies
+                # policy loss = J
+                mu_list = [ aInnerLoop.step_tensor(b_state1, add_ou = False) for aInnerLoop in agents ]
+                agent.model_actor.zero_grad()
+                policy_J = -critic.forward_tensor(b_state1, mu_list)
+                policy_J_mean = policy_J.mean()
+                if not evaluation_episode:
+                    policy_J_mean.backward()
+                    agent.optimizer_step()
+                #
+                # save outputs
+                output_loss_list.append(float(L.detach().numpy()))
+                output_q_st2_list.append(float(q_st2.detach().mean().numpy()))
+                output_J_mean_list.append(float(policy_J_mean.detach().numpy()))
+                # compute and store frobenius norms for the weights
+                cr_fnorm1, cr_fnorm2, ag_fnorm1, ag_fnorm2 = 0, 0, 0, 0
+                for p in critic.model.parameters():
+                    if len(p.shape) == 1: cr_fnorm2 += float(p.cpu().norm().detach().cpu().numpy())
+                    else: cr_fnorm1 += float(p.norm().detach().cpu().numpy())
+                for p in agent.model_actor.parameters():
+                    if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                    else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+                output_cr_frobnorm_mat_list.append( cr_fnorm1 )
+                output_cr_frobnorm_bia_list.append( cr_fnorm2 )
+                output_ag_frobnorm_mat_list.append( ag_fnorm1 )
+                output_ag_frobnorm_bia_list.append( ag_fnorm2 )
 
         #
         # store detailed output, if extended logging is selected
         if extended_logging and not sqloutput is None:
             sqloutput.add_every_step_of_some_episodes( locals() )
 
-        if timestep % 20 == 0:
-            eval_ep_str     = "  " if evaluation_epoch   else "no"
+        if timestep % 200 == 0:
+            eval_ep_str     = "  " if evaluation_episode else "no"
             rand_pr_add_str = "  " if add_random_process else "no"
-            if timestep % 200 == 0:
-                print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.")
-            #else:
-            #    print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.", end="\r")
+            print(f"ep. {episode_number:3}, ts. {timestep:5}: {state['time']}, {eval_ep_str} eval ep., {rand_pr_add_str} rand. p. add.")
 
     #
-    # update target network for actors
+    # update target networks
     status_output_dict["target_network_update"] = False
     if episode_number % TARGET_NETWORK_UPDATE_FREQ == 0:
-        for agent in agents:
-            agent.copy_weights_to_target()
-        status_output_dict["target_network_update"] = True
+        if algorithm == "ddqn":
+            for agent in agents:
+                agent.copy_weights_to_target()
+            status_output_dict["target_network_update"] = True
+        elif algorithm == "ddpg":
+            # update target critic
+            for critic in critics:
+                critic.update_target_network(TAU_TARGET_NETWORKS)
+            # update target network for actor
+            for agent in agents:
+                agent.update_target_network(TAU_TARGET_NETWORKS)
+            status_output_dict["target_network_update"] = True
 
     #
     # status output dict postprocessing
@@ -469,140 +321,17 @@ def ddqn_episode_mc(building, building_occ, agents,
     status_output_dict["mean_manual_stp_ch_n"]   = np.mean(output_n_stp_ch)
     status_output_dict["current_energy_Wh_mean"] = np.mean(output_energy_Wh)
     status_output_dict["current_energy_Wh_sum"]  = np.sum(output_energy_Wh)
-    status_output_dict["evaluation_epoch"] = evaluation_epoch
+    status_output_dict["evaluation_epoch"] = evaluation_episode
     status_output_dict["random_process_addition"] = add_random_process
     status_output_dict["loss_mean"] = np.mean(output_loss_list)
     status_output_dict["frobnorm_agent_matr_mean"] = np.mean(output_ag_frobnorm_mat_list)
     status_output_dict["frobnorm_agent_bias_mean"] = np.mean(output_ag_frobnorm_bia_list)
+    if algorithm == "ddpg":
+        status_output_dict["frobnorm_critic_matr_mean"] = np.mean(output_cr_frobnorm_mat_list)
+        status_output_dict["frobnorm_critic_bias_mean"] = np.mean(output_cr_frobnorm_bia_list)
+        status_output_dict["q_st2_mean"] = np.mean(output_q_st2_list)
+        status_output_dict["J_mean"] = np.mean(output_J_mean_list)
     return status_output_dict
-
-
-
-
-
-def one_baseline_episode(building, building_occ, args, sqloutput = None):
-    hyper_params = args
-    episode_number = 0
-    #
-    # define the hyper-parameters
-    if hyper_params is None:
-        LAMBDA_REWARD_ENERGY = 0.1
-        LAMBDA_REWARD_MANU_STP_CHANGES = 150
-        TAU_TARGET_NETWORKS = 0.01
-        DISCOUNT_FACTOR = 0.9
-        BATCH_SIZE = 128
-        RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
-        LEARNING_RATE = 0.01
-    else:
-        LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
-        LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
-        TAU_TARGET_NETWORKS  = hyper_params.tau
-        DISCOUNT_FACTOR = hyper_params.discount_factor
-        BATCH_SIZE      = hyper_params.batch_size
-        RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
-        LEARNING_RATE   = hyper_params.lr
-    #
-    # Set model parameters
-    episode_len        = args.episode_length
-    episode_start_day  = args.episode_start_day
-    episode_start_month= args.episode_start_month
-    building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
-    building.model.set_timestep( args.ts_per_hour )
-    #
-    # Define the agents
-    agents = []
-    for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
-        new_agent = agent_constructor( controlled_device_type )
-        new_agent.initialize(
-                         name = agent_name,
-                         controlled_element = controlled_device,
-                         args = args)
-        agents.append(new_agent)
-    #
-    # prepare the simulation
-    state = building.model.reset()
-    SU.fix_year_confussion(state)
-    #
-    current_occupancy = building_occ.draw_sample( state["time"] )
-    timestep   = 0
-    last_state = None
-    ts_diff_in_min = 60 // args.ts_per_hour
-    #
-    # lists for storing all states and all actions taken
-    episode_states_list  = []
-    episode_actions_list = []
-    episode_cobs_send_list = []
-    #
-    # start the simulation loop
-    while not building.model.is_terminate():
-        actions = list()
-        
-        currdate = state['time']
-        #
-        # request occupancy for the next state
-        nextdate = state['time'] + datetime.timedelta(minutes=ts_diff_in_min)
-        next_occupancy = building_occ.draw_sample(nextdate)
-        #
-        # propagate occupancy values to COBS / EnergyPlus
-        for zonename, occd in next_occupancy.items():
-            actions.append({"priority":        0,
-                            "component_type": "Schedule:Constant",
-                            "control_type":   "Schedule Value",
-                            "actuator_key":  f"OCC-SCHEDULE-{zonename}",
-                            "value":           next_occupancy[zonename]["relative number occupants"],
-                            "start_time":      state['timestep'] + 1})
-
-        #
-        # request new actions from all agents
-        agent_actions_dict = {}
-        for agent in agents:
-            agent_actions_dict[agent.name] = agent.step(state)
-
-        #
-        # send agent actions to the building object and obtaion the actions for COBS/eplus
-        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
-
-        #
-        # save state and actions
-        episode_states_list.append(state)
-        episode_actions_list.append(agent_actions_dict)
-        episode_cobs_send_list.append(actions)
-
-        #
-        # send actions to EnergyPlus and obtian the new state
-        last_state = state
-        timestep  += 1
-        state      = building.model.step(actions)
-        current_occupancy = next_occupancy
-        SU.fix_year_confussion(state)
-
-        current_energy_Wh = state["energy"] / 360
-
-        # modify state
-        norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
-
-        #
-        # send current temp/humidity values for all rooms
-        # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(currdate, state["temperature"], None)
-
-        #
-        # reward computation
-        reward = -( LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes )
-
-        #
-        # store detailed output
-        if not sqloutput is None:
-            sqloutput.add_every_step_of_some_episodes( locals() )
-
-        if timestep % 20 == 0:
-            print(f"baseline episode, timestep {timestep:5}: {state['time']}")
-
-    # commit sql output if available
-    if not sqloutput is None: sqloutput.db.commit()
-
-    return episode_states_list, episode_actions_list, episode_cobs_send_list
-
 
 
 
@@ -642,8 +371,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
     #
     # Define the critics
+    critics = []
     if args.algorithm == "ddpg":
-        critics = []
         ciritic_input_variables=["Minutes of Day","Day of Week","Calendar Week",
                                  "Outdoor Air Temperature","Outdoor Air Humidity",
                                  "Outdoor Wind Speed","Outdoor Wind Direction",
@@ -678,11 +407,36 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     building.model.set_runperiod(episode_len, 2017, episode_start_month, episode_start_day)
     building.model.set_timestep( args.ts_per_hour )
 
+    if args.algorithm == "baseline_rule-based":
+        status_output_dict = \
+            one_single_episode(
+                        algorithm      = "baseline_rule-based",
+                        building       = building,
+                        building_occ   = building_occ,
+                        agents         = agents,
+                        critics        = critics,
+                        hyper_params   = args,
+                        episode_number = 0,
+                        sqloutput      = sqloutput,
+                        extended_logging   = True,
+                        evaluation_episode = True,
+                        add_random_process_in_eval_epoch = False,
+                        ts_diff_in_min = ts_diff_in_min,
+                        rpb            = rpb)
+        if not sqloutput is None:
+            sqloutput.add_last_step_of_episode( status_output_dict )
+        return
+
     for n_episode in range(episode_offset, n_episodes + episode_offset):
 
         t_start = timeit.default_timer()
 
-        if args.algorithm == "ddpg":
+        if args.algorithm == "ddqn":
+            # set epsilon for all agents
+            epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
+            for agent in agents:
+                agent.epsilon = epsilon
+        elif args.algorithm == "ddpg":
             # set ou-parameters for all agents
             ou_mu    = 0.0
             ou_theta = max(args.ou_theta, np.exp(n_episode * np.log(args.ou_theta / 3) / args.epsilon_final_step))
@@ -691,45 +445,30 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                 agent.ou_theta = ou_theta
                 agent.ou_sigma = ou_sigma
                 agent.ou_mu    = ou_mu
-            # run one episode
-            status_output_dict = \
-            ddpg_episode_mc(
-                        building,
-                        building_occ,
-                        agents,
-                        critics,
-                        args,
-                        n_episode,
-                        sqloutput,
-                        (n_episode+1) % args.network_storage_frequency == 0,
-                        (n_episode+1) % args.network_storage_frequency == 0,
-                        args.add_ou_in_eval_epoch,
-                        ts_diff_in_min,
-                        rpb)
+
+        # run one episode
+        status_output_dict = \
+            one_single_episode(
+                        algorithm      = args.algorithm,
+                        building       = building,
+                        building_occ   = building_occ,
+                        agents         = agents,
+                        critics        = critics,
+                        hyper_params   = args,
+                        episode_number = n_episode,
+                        sqloutput      = sqloutput,
+                        extended_logging   = (n_episode+1) % args.network_storage_frequency == 0,
+                        evaluation_episode = (n_episode+1) % args.network_storage_frequency == 0,
+                        add_random_process_in_eval_epoch = args.add_ou_in_eval_epoch,
+                        ts_diff_in_min = ts_diff_in_min,
+                        rpb = rpb)
+
+        if args.algorithm == "ddqn":
+            status_output_dict["epsilon"] = epsilon
+        elif args.algorithm == "ddpg":
             status_output_dict["ou_theta"] = ou_theta
             status_output_dict["ou_sigma"] = ou_sigma
             status_output_dict["ou_mu"]    = ou_mu
-
-        elif args.algorithm == "ddqn":
-            # set epsilon for all agents
-            epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
-            for agent in agents:
-                agent.epsilon = epsilon
-            # run one episode
-            status_output_dict = \
-            ddqn_episode_mc(
-                        building,
-                        building_occ,
-                        agents,
-                        args,
-                        n_episode,
-                        sqloutput,
-                        (n_episode+1) % args.network_storage_frequency == 0,
-                        (n_episode+1) % args.network_storage_frequency == 0,
-                        args.add_ou_in_eval_epoch,
-                        ts_diff_in_min,
-                        rpb)
-            status_output_dict["epsilon"] = epsilon
 
         t_end  = timeit.default_timer()
         t_diff = t_end - t_start
