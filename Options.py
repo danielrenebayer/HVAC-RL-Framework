@@ -35,6 +35,7 @@ def get_argparser():
     parser.add_argument('--episode_length', type=int, default=30, help="The length of an episode in days")
     parser.add_argument('--episode_start_day', type=int, default=1)
     parser.add_argument('--episode_start_month', type=int, default=7)
+    parser.add_argument('--agent_network', type=str, default="2HiddenLayer,Trapezium")
     parser.add_argument('--critic_hidden_size', type=int, default=40)
     parser.add_argument('--critic_hidden_activation', type=str, default="tanh", choices=["tanh","LeakyReLU"])
     parser.add_argument('--critic_last_activation',   type=str, default="tanh", choices=["tanh","LeakyReLU"])

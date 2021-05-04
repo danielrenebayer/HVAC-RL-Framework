@@ -6,6 +6,7 @@ import itertools
 
 import RLUtilities
 from RandomProcessExt import OrnsteinUhlenbeckProcess
+from Networks import generate_network
 
 def agent_constructor(zone_class, rl_storage_filepath=None):
     if zone_class == "VAV with Reheat,Heating,Cooling,NoRL":
@@ -495,6 +496,7 @@ class QNetwork:
         self.epsilon  = 0.05 if args is None else args.epsilon
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
         self.optimizer_name = "adam" if args is None else args.optimizer
+        self.agent_network_name = "2HiddenLayer,Trapezium" if args is None else args.agent_network
         self.shared_network_per_agent_class = False
         self.shared_network_holding_agent   = None
 
@@ -512,11 +514,7 @@ class QNetwork:
 
         self.output_size = len(self.output_to_action_mapping)
         input_size   = len(self.input_parameters)
-        hidden_size1 =  3*input_size+  self.output_size
-        hidden_size2 = (hidden_size1+2*self.output_size) // 3
         self.input_size   = input_size
-        self.hidden_size1 = hidden_size1
-        self.hidden_size2 = hidden_size2
 
         # define the transformation matrix
         trafo_list = []
@@ -572,20 +570,8 @@ class QNetwork:
         """
         Initializes the actor and target model from scratch.
         """
-        self.model_actor = torch.nn.Sequential(
-            torch.nn.Linear(self.input_size,   self.hidden_size1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(self.hidden_size1, self.hidden_size2),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(self.hidden_size2, self.output_size)
-        )
-        self.model_target = torch.nn.Sequential(
-            torch.nn.Linear(self.input_size,   self.hidden_size1),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(self.hidden_size1, self.hidden_size2),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(self.hidden_size2, self.output_size)
-        )
+        self.model_actor = generate_network(self.agent_network_name, self.input_size, self.output_size)
+        self.model_target = generate_network(self.agent_network_name, self.input_size, self.output_size)
         # change initialization
         for m_param in self.model_actor.parameters():
             if len(m_param.shape) == 1:
