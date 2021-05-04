@@ -167,7 +167,8 @@ def one_single_episode(algorithm,
         #elif hyper_params.reward_function == "rulebased_agent_output":
         else:
             reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
-        reward = -reward
+        # invert and scale reward and (maybe) add offset
+        reward = -hyper_params.reward_scale * reward + hyper_params.reward_offset
         if not hyper_params is None and hyper_params.log_reward:
             reward = - np.log(-reward + 1)
         # add reward to output list for command-line outputs
@@ -551,7 +552,7 @@ def reward_fn_rulebased_agent_output(state, agent_actions_dict, building):
         else:
             # if the temperature is not in the range [15,17], change the setpoint
             for room in building.room_names:
-                target_temp_per_room[room] = 22.0
+                target_temp_per_room[room] = 16.0
             if agent_heating_setpoint < 15:
                 changed_magnitude += 15 - agent_heating_setpoint
             elif agent_heating_setpoint > 17:
