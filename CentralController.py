@@ -43,6 +43,8 @@ def one_single_episode(algorithm,
     #
     # define the output dict containing status informations
     status_output_dict = {}
+    if hyper_params.verbose_output_mode:
+        status_output_dict["verbose_output"] = []
     #
     # Define the replay ReplayBuffer
     if rpb is None:
@@ -119,6 +121,12 @@ def one_single_episode(algorithm,
                     new_action = agent.next_action(norm_state_ten, add_random_process)
                     agent_actions_list.append( new_action )
                     agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
+                    if hyper_params.verbose_output_mode:
+                        _, vo_ipt = agent.step_tensor(norm_state_ten, True, True)
+                        vodict = {"state": state, "norm_state_ten": norm_state_ten,
+                                  "agent_action": new_action,
+                                  "agent internal input tensor": vo_ipt.detach()}
+                        status_output_dict["verbose_output"].append(vodict)
             # no backtransformation of variables needed, this is done in agents definition already
 
         elif algorithm == "ddpg":
@@ -471,6 +479,17 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
             status_output_dict["ou_theta"] = ou_theta
             status_output_dict["ou_sigma"] = ou_sigma
             status_output_dict["ou_mu"]    = ou_mu
+
+        if args.verbose_output_mode:
+            f = open(f"{args.checkpoint_dir}/vbo-status_output_dict-{n_episode}.pickle", "wb")
+            pickle.dump(status_output_dict["verbose_output"], f)
+            f.close()
+            f = open(f"{args.checkpoint_dir}/vbo-agents-{n_episode}.pickle", "wb")
+            pickle.dump(agents, f)
+            f.close()
+            f = open(f"{args.checkpoint_dir}/vbo-building-{n_episode}.pickle", "wb")
+            pickle.dump(building.global_state_variables, f)
+            f.close()
 
         t_end  = timeit.default_timer()
         t_diff = t_end - t_start

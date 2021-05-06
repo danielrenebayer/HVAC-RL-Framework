@@ -614,7 +614,7 @@ class QNetwork:
         for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(mactor_param.data)
 
-    def step_tensor(self, state_tensor, use_actor = True):
+    def step_tensor(self, state_tensor, use_actor = True, verbose_output = False):
         """
         Computes the next step and outputs the resulting torch tensor.
 
@@ -642,6 +642,8 @@ class QNetwork:
             output_tensor  = self.model_target(input_tensor)
         if self.use_cuda:
             output_tensor  = output_tensor.cpu()
+        if verbose_output:
+            return output_tensor, input_tensor
         return output_tensor
 
     def next_action(self, state, use_random_action_selection = False):
