@@ -17,7 +17,7 @@ class SQLOutput():
 
         # output vars every episode at the end accumulated or somehow aggreated
         self.output_vars_eels = {
-            "episode":  ["integer", "episode_number"],
+            "episode":  ["integer", "episode"],
             "lr":       ["integer", "lr"],
             "tau":      ["float",   "tau"],
             "ou_theta": ["float",   "ou_theta"],
