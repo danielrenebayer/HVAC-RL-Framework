@@ -169,12 +169,15 @@ def one_single_episode(algorithm,
         #
         # reward computation
         if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
-            reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes
+            n_manual_stp_changes_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
+            reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
         elif hyper_params.reward_function == "rulebased_roomtemp":
             reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building)
+            reward = setpoint_activation_function(reward, hyper_params.stp_reward_function)
         #elif hyper_params.reward_function == "rulebased_agent_output":
         else:
             reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
+            reward = setpoint_activation_function(reward, hyper_params.stp_reward_function)
         # invert and scale reward and (maybe) add offset
         reward = -hyper_params.reward_scale * reward + hyper_params.reward_offset
         if not hyper_params is None and hyper_params.log_reward:
@@ -511,6 +514,21 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
         # commit sql output if available
         if not sqloutput is None: sqloutput.db.commit()
+
+
+
+
+def setpoint_activation_function(n_stp_changes, function_name):
+    if function_name == "quadratic":
+        return np.power(n_stp_changes, 2)
+    elif function_name == "cubic":
+        return np.power(n_stp_changes, 3)
+    elif function_name == "exponential":
+        return np.exp(n_stp_changes)
+    elif function_name == "linear":
+        return n_stp_changes
+    else:
+        raise AttributeError(f"Unknown function name {function_name}.")
 
 
 
