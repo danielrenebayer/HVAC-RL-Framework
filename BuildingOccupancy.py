@@ -718,7 +718,7 @@ class BuildingOccupancyAsMatrix:
         minute  = dto.minute
         return self.ts_per_hour * 24 * weekday + self.ts_per_hour * hour + self.ts_per_hour * minute // 60
 
-    def manual_setpoint_changes(self, dto, temp_values, current_setpoints):
+    def manual_setpoint_changes(self, dto, temp_values, current_setpoints, discomfort_step_offset = 0.0):
         """
         Obtain the number of manual setpoint changes made by the occupants.
 
@@ -754,6 +754,7 @@ class BuildingOccupancyAsMatrix:
             if diff > 1.0:
                 no_manual_setp_changes += people_in_rooms[idroom]
                 changed_magnitude += diff
+                changed_magnitude += discomfort_step_offset
             target_temp_per_room[room] = room_target_temp[idroom]
 
         return no_manual_setp_changes, changed_magnitude, target_temp_per_room

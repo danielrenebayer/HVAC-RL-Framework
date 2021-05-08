@@ -25,6 +25,7 @@ def get_argparser():
     parser.add_argument('--reward_scale', type=float, default=1.0, help="Scaling factor for the final reward. Must not be negative.")
     parser.add_argument('--reward_offset', type=float, default=0.0, help="Offset to add on the final reward. Can be negative too.")
     parser.add_argument('--stp_reward_function', type=str, default="linear", choices=["linear", "quadratic", "cubic", "exponential"], help="Function to apply to number of setpoint changes / rulebased missmatches / agent-output missmatches, but NOT on the energy reward")
+    parser.add_argument('--stp_reward_step_offset', type=float, default=0.0, help="Offset for manual setpoint changes.")
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--target_network_update_freq', type=int, default=3)

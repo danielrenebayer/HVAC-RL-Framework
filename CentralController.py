@@ -164,7 +164,7 @@ def one_single_episode(algorithm,
         #
         # send current temp/humidity values for all rooms
         # obtain number of manual setpoint changes
-        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None)
+        _, n_manual_stp_changes, target_temp_per_room = building_occ.manual_setpoint_changes(state['time'], state["temperature"], None, hyper_params.stp_reward_step_offset)
 
         #
         # reward computation
@@ -172,11 +172,11 @@ def one_single_episode(algorithm,
             n_manual_stp_changes_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
             reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
         elif hyper_params.reward_function == "rulebased_roomtemp":
-            reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building)
+            reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building, hyper_params.stp_reward_step_offset)
             reward = setpoint_activation_function(reward, hyper_params.stp_reward_function)
         #elif hyper_params.reward_function == "rulebased_agent_output":
         else:
-            reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building)
+            reward, target_temp_per_room = reward_fn_rulebased_agent_output(state, agent_actions_dict, building, hyper_params.stp_reward_step_offset)
             reward = setpoint_activation_function(reward, hyper_params.stp_reward_function)
         # invert and scale reward and (maybe) add offset
         reward = -hyper_params.reward_scale * reward + hyper_params.reward_offset
@@ -534,7 +534,7 @@ def setpoint_activation_function(n_stp_changes, function_name):
 
 
 
-def reward_fn_rulebased_roomtemp(state, building):
+def reward_fn_rulebased_roomtemp(state, building, discomfort_step_offset = 0.0):
     """
     This is an alternative reward function.
     It loops over all rooms, returning a (positiv) reward, iff the temperature is out of a given band.
@@ -550,21 +550,25 @@ def reward_fn_rulebased_roomtemp(state, building):
             target_temp_per_room[room] = 22.0
             if temp_values[room] < 21.0:
                 changed_magnitude += 21.0 - temp_values[room]
+                changed_magnitude += discomfort_step_offset
             elif temp_values[room] > 23.5:
                 changed_magnitude += temp_values[room] - 23.5
+                changed_magnitude += discomfort_step_offset
         else:
             # if the temperature is not in the range [15.0,17.0], change the setpoint
             target_temp_per_room[room] = 16.0
             if temp_values[room] < 15:
-                changed_magnitude += 15 - temp_values[room]
+                changed_magnitude += 15.0 - temp_values[room]
+                changed_magnitude += discomfort_step_offset
             elif temp_values[room] > 17:
-                changed_magnitude += temp_values[room] - 17
+                changed_magnitude += temp_values[room] - 17.0
+                changed_magnitude += discomfort_step_offset
     return changed_magnitude, target_temp_per_room
 
 
 
 
-def reward_fn_rulebased_agent_output(state, agent_actions_dict, building):
+def reward_fn_rulebased_agent_output(state, agent_actions_dict, building, discomfort_step_offset = 0.0):
     """
     This is another alternative reward function.
     It loops over all agents, returning a (positiv) reward, iff the agent-computed heating setpoint is out of a given band.
@@ -584,16 +588,20 @@ def reward_fn_rulebased_agent_output(state, agent_actions_dict, building):
                 target_temp_per_room[room] = 22.0
             if agent_heating_setpoint < 21.0:
                 changed_magnitude += 21.0 - agent_heating_setpoint
+                changed_magnitude += discomfort_step_offset
             elif agent_heating_setpoint > 23.5:
                 changed_magnitude += agent_heating_setpoint - 23.5
+                changed_magnitude += discomfort_step_offset
         else:
             # if the temperature is not in the range [15,17], change the setpoint
             for room in building.room_names:
                 target_temp_per_room[room] = 16.0
             if agent_heating_setpoint < 15:
-                changed_magnitude += 15 - agent_heating_setpoint
+                changed_magnitude += 15.0 - agent_heating_setpoint
+                changed_magnitude += discomfort_step_offset
             elif agent_heating_setpoint > 17:
-                changed_magnitude += agent_heating_setpoint - 17
+                changed_magnitude += agent_heating_setpoint - 17.0
+                changed_magnitude += discomfort_step_offset
     return changed_magnitude, target_temp_per_room
 
 
