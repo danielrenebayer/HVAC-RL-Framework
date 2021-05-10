@@ -10,9 +10,9 @@ class ReplayBufferStd:
         """
         the replay buffer contains data which is described by the (state, action, reward, state') 4-tupel in theory.
         """
-        self._replay_list_state1 = []
-        self._replay_list_state2 = []
-        self._replay_list_actions= []
+        self._replay_list_state1 = [ None for _ in range(size) ]
+        self._replay_list_state2 = [ None for _ in range(size) ]
+        self._replay_list_actions= [ None for _ in range(size) ]
         self._replay_ten_rewards = torch.zeros((size, 1), dtype=torch.float32)
         self._size = 0
         self._next_index = 0 # this is the index where to input the next element if add_transition() is called
@@ -27,14 +27,10 @@ class ReplayBufferStd:
                        state2):
         if self._size < self.max_size:
             self._size += 1
-        else:
-            self._replay_list_state2.pop(0)
-            self._replay_list_state1.pop(0)
-            self._replay_list_actions.pop(0)
 
-        self._replay_list_state1.append(state1)
-        self._replay_list_state2.append(state2)
-        self._replay_list_actions.append(actions)
+        self._replay_list_state1[self._next_index]  = state1
+        self._replay_list_state2[self._next_index]  = state2
+        self._replay_list_actions[self._next_index] = actions
 
         self._replay_ten_rewards[self._next_index] = reward
         self._next_index = (self._next_index + 1) % self.max_size
