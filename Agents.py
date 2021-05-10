@@ -497,6 +497,7 @@ class QNetwork:
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
         self.optimizer_name = "adam" if args is None else args.optimizer
         self.agent_network_name = "2HiddenLayer,Trapezium" if args is None else args.agent_network
+        self.args = args
         self.shared_network_per_agent_class = False
         self.shared_network_holding_agent   = None
 
@@ -576,9 +577,9 @@ class QNetwork:
         for m_param in self.model_actor.parameters():
             if len(m_param.shape) == 1:
                 # other initialization for biases
-                torch.nn.init.constant_(m_param, 0.00001)
+                torch.nn.init.constant_(m_param, -0.00001)
             else:
-                torch.nn.init.normal_(m_param, 0.0, 0.8)
+                RLUtilities.init_tensor(m_param, self.args)
         # copy weights from actor -> target
         self.copy_weights_to_target()
         # initialize the optimizer
