@@ -66,6 +66,7 @@ def get_argparser():
     parser.add_argument('--rulebased_setpoint_unoccu_delta', type=float, default= 7.0)
     parser.add_argument('--rulebased_setpoint_occu_mean',    type=float, default=21.5)
     parser.add_argument('--rulebased_setpoint_occu_delta',   type=float, default= 1.0)
+    parser.add_argument('--output_Q_vals_iep',  action="store_true", help="Output Q values in evaluation episodes.")
     parser.add_argument('--verbose_output_mode', action="store_true")
 
     return parser

@@ -73,6 +73,9 @@ def one_single_episode(algorithm,
         output_loss_list = [0]
         output_ag_frobnorm_mat_list = [0]
         output_ag_frobnorm_bia_list = [0]
+    # list for q values output, if selected
+    if evaluation_episode and hyper_params.output_Q_vals_iep:
+        q_values_list = [ [] for _ in agents ]
     #
     # prepare the simulation
     state = building.model_reset()
@@ -128,6 +131,12 @@ def one_single_episode(algorithm,
                                   "agent internal input tensor": vo_ipt.detach()}
                         status_output_dict["verbose_output"].append(vodict)
             # no backtransformation of variables needed, this is done in agents definition already
+            #
+            # output Q values in eval episode if selected
+            if evaluation_episode and hyper_params.output_Q_vals_iep:
+                for idx, agent in enumerate(agents):
+                    q_values = agent.step_tensor(norm_state_ten, use_actor=True).detach().numpy()
+                    q_values_list[idx].append(q_values)
 
         elif algorithm == "ddpg":
             for agent in agents:
@@ -344,6 +353,17 @@ def one_single_episode(algorithm,
         status_output_dict["frobnorm_critic_bias_mean"] = np.mean(output_cr_frobnorm_bia_list)
         status_output_dict["q_st2_mean"] = np.mean(output_q_st2_list)
         status_output_dict["J_mean"] = np.mean(output_J_mean_list)
+    # output q values list if selected
+    if evaluation_episode and hyper_params.output_Q_vals_iep:
+        f = open(os.path.join(hyper_params.checkpoint_dir, f"q_values.pickle"), "wb")
+        pickle_dict = {
+            "Q value list": q_values_list,
+            "Actions":      [ [agent.output_action_to_action_dict(i) for i in range(len(agent.output_to_action_mapping))] for agent in agents ]
+        }
+        pickle.dump(pickle_dict, f)
+        f.close()
+        #f = os.path.join(hyper_params.checkpoint_dir, f"q_values")
+        #np.save(f, np.array(q_values_list))
     return status_output_dict
 
 
