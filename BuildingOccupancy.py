@@ -656,7 +656,11 @@ class BuildingOccupancyAsMatrix:
 
     def __init__(self, args, building):
         building_occ = BuildingOccupancy()
-        building_occ.set_room_settings({"SPACE5-1":33,"SPACE3-1":17}, {"SPACE1-1":20,"SPACE2-1":10,"SPACE4-1":10})
+        office_rooms     = ["SPACE5-1","SPACE3-1"]
+        conference_rooms = ["SPACE1-1","SPACE2-1","SPACE4-1"]
+        building_occ.set_room_settings(
+                { r: building.max_pers_per_room[r] for r in office_rooms },
+                { r: building.max_pers_per_room[r] for r in conference_rooms } )
         building_occ.generate_random_occupants(args.number_occupants)
         # mo. 9-12h meeting in Space4-1 with high setpoint (24 deg), 12 people
         # wen. 13-16h meeting in Space4-1 with low setpoint (20 deg), 12 people (different than on monday)

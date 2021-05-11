@@ -12,6 +12,7 @@ class Building_5ZoneAirCooled:
         #
         #
         self.room_names = [f'SPACE{i}-1' for i in range(1,6)]
+        self.max_pers_per_room = {"SPACE5-1":28,"SPACE3-1":15,"SPACE1-1":20,"SPACE2-1":10,"SPACE4-1":10}
         #
         # the pairing which gives, which agent (identified by name) controlles which device (or zone) and what kind of device it is
         if args.algorithm == "ddpg":
@@ -144,7 +145,7 @@ class Building_5ZoneAirCooled:
             model.edit_configuration("People",
                                     {"Name": f"{r} People 1"},
                                     {"Number of People Schedule Name": f"OCC-SCHEDULE-{r}",
-                                     "Number of People": 50})
+                                     "Number of People": self.max_pers_per_room[r]})
         #
         # list all state variables
         self.global_state_variables = ["Minutes of Day", "Day of Week", "Calendar Week"]
