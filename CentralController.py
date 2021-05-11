@@ -571,8 +571,8 @@ def reward_fn_rulebased_roomtemp(state, building, discomfort_step_offset = 0.0):
             if temp_values[room] < 21.0:
                 changed_magnitude += 21.0 - temp_values[room]
                 changed_magnitude += discomfort_step_offset
-            elif temp_values[room] > 23.5:
-                changed_magnitude += temp_values[room] - 23.5
+            elif temp_values[room] > 23.0:
+                changed_magnitude += temp_values[room] - 23.0
                 changed_magnitude += discomfort_step_offset
         else:
             # if the temperature is not in the range [15.0,17.0], change the setpoint
