@@ -59,7 +59,7 @@ def get_argparser():
         "Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent",
         "Building_5ZoneAirCooled_SingleSetpoint_SingleAgent",
         "Building_5ZoneAirCooled_SingleAgent", "Building_5ZoneAirCooled_SmallSingleAgent"])
-    parser.add_argument('--number_occupants', type=int, default=40)
+    parser.add_argument('--number_occupants', type=int, default=35)
     parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")
     parser.add_argument('--load_models_episode', type=int, default=0, help="The episode to load. If load_models_from_path is set to an empty string, it will be ignored.")
     parser.add_argument('--continue_training', action='store_true', help="If this parameter is given, the controller loads the existing models from the checkpoints dir. If the file `status.pickle` does not exist in checkpoints dir, it will start a new training run.")
