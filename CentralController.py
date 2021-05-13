@@ -134,9 +134,14 @@ def one_single_episode(algorithm,
             #
             # output Q values in eval episode if selected
             if evaluation_episode and hyper_params.output_Q_vals_iep:
-                for idx, agent in enumerate(agents):
-                    q_values = agent.step_tensor(norm_state_ten, use_actor=True).detach().numpy()
-                    q_values_list[idx].append(q_values)
+                if agents[0].shared_network_per_agent_class:
+                    q_values = agents[0].step_tensor(norm_state_ten, use_actor=True).detach().numpy()
+                    for idx, agent in enumerate(agents):
+                        q_values_list[idx].append(q_values[idx])
+                else:
+                    for idx, agent in enumerate(agents):
+                        q_values = agent.step_tensor(norm_state_ten, use_actor=True).detach().numpy()
+                        q_values_list[idx].append(q_values)
 
         elif algorithm == "ddpg":
             for agent in agents:
