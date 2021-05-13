@@ -13,7 +13,7 @@ class Person:
         self.gender = gender
         self.default_office = default_office
         self._meetings = []
-        self.presence_start = datetime.time(hour=np.random.randint(6,10), minute=0)
+        self.presence_start = datetime.time(hour=np.random.randint(8,11), minute=0)
         self.presence_end   = datetime.time(hour=self.presence_start.hour + 8, minute=0)
         
         if comfort_temp is None:
@@ -339,12 +339,15 @@ class BuildingOccupancy:
     def generate_random_meetings(self,
                                  number_meetings_per_week,
                                  number_onetime_meetings,
-                                 min_people_joining_meeting=3, max_peope_joining_meeting=10):
+                                 min_people_joining_meeting=3, max_peope_joining_meeting=10,
+                                 conference_room_names = None):
         generated_weekly_meetings = 0
         generated_onetime_meetings = 0
 
         # generate weekly meetings
-        selected_room = np.random.choice(list(self.conference_rooms.keys()), number_meetings_per_week)
+        if conference_room_names is None:
+            conference_room_names = list(self.conference_rooms.keys())
+        selected_room = np.random.choice(conference_room_names, number_meetings_per_week)
         selected_dow  = np.random.randint(0,  5, number_meetings_per_week)
         selected_ts_h = np.random.randint(7, 15, number_meetings_per_week)
         selected_ts_m = np.random.randint(0, 60, number_meetings_per_week)
@@ -664,16 +667,22 @@ class BuildingOccupancyAsMatrix:
         building_occ.generate_random_occupants(args.number_occupants)
         # mo. 9-12h meeting in Space4-1 with high setpoint (24 deg), 12 people
         # wen. 13-16h meeting in Space4-1 with low setpoint (20 deg), 12 people (different than on monday)
+        # don. 8-17h two persons in Space4-1 with low avgerage (22 deg)
         meeting1 = building_occ.add_weekly_meeting("SPACE4-1", 0, datetime.time(hour=9), datetime.time(hour=12))
         meeting2 = building_occ.add_weekly_meeting("SPACE4-1", 2, datetime.time(hour=9), datetime.time(hour=12))
+        meeting3 = building_occ.add_weekly_meeting("SPACE4-1", 3, datetime.time(hour=8), datetime.time(hour=17))
         for pers in building_occ.occupants[0:12]:
             meeting1.add_participant(pers)
             pers.comfort_temp = 24
         for pers in building_occ.occupants[12:24]:
             meeting2.add_participant(pers)
             pers.comfort_temp = 20
-        # add more random meetings
-        building_occ.generate_random_meetings(5,0)
+        for pers in building_occ.occupants[24:26]:
+            meeting3.add_participant(pers)
+            pers.comfort_temp = 22
+        # add more random meetings, but only in Room "SPACE1-1" and "SPACE2-1"
+        # SPACE4-1 is in manual mode only
+        building_occ.generate_random_meetings(5,0, conference_room_names=["SPACE1-1","SPACE2-1"])
         # transform building_occ to a matrix
         year = 2017
         month = args.episode_start_month
