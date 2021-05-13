@@ -38,7 +38,6 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             'Outdoor Solar Radi Diffuse',
             'Outdoor Solar Radi Direct',
             "Zone Relative Humidity",
-            "Zone VAV Reheat Damper Position",
             "Zone CO2",
             "Zone People Count",
             "Zone Temperature"]
@@ -115,12 +114,9 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Outdoor Air Temperature",
             "Outdoor Air Humidity",
             "Outdoor Wind Speed",
-            'Outdoor Wind Direction',
             'Outdoor Solar Radi Diffuse',
             'Outdoor Solar Radi Direct',
             "Zone Relative Humidity",
-            "Zone VAV Reheat Damper Position",
-            "Zone CO2",
             "Zone People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = {
@@ -141,7 +137,6 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
         for zone in [f"SPACE{i}-1" for i in range(1,6)]:
             new_agent.input_parameters.extend([
                 f"{zone} Zone Relative Humidity",
-                f"{zone} Zone VAV Reheat Damper Position",
                 f"{zone} Zone CO2",
                 f"{zone} Zone People Count",
                 f"{zone} Zone Temperature"])
