@@ -554,7 +554,10 @@ class QNetwork:
                 QNetwork._agent_class_shared_networks[ self.class_name ] = self
                 QNetwork._agent_class_shared_n_count[  self.class_name ] = 1
                 self.shared_network_holding_agent = self
-                self._init_models_from_scratch()
+                if load_path != "":
+                    self._load_models_from_disk(load_path, load_prefix)
+                else:
+                   self._init_models_from_scratch()
                 self.shared_trafo_matrix = torch.zeros_like(self.trafo_matrix).copy_(self.trafo_matrix)
         elif load_path != "":
             self._load_models_from_disk(load_path, load_prefix)
