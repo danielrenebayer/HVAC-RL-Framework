@@ -80,6 +80,7 @@ def one_single_episode(algorithm,
     # prepare the simulation
     state = building.model_reset()
     SU.fix_year_confussion(state)
+    SU.expand_state_next_occup(state, building, hyper_params.next_occ_horizont, ts_diff_in_min, building_occ)
     norm_state_ten = SU.unnormalized_state_to_tensor(state, building)
     #
     current_occupancy = building_occ.draw_sample( state["time"] )
@@ -168,6 +169,7 @@ def one_single_episode(algorithm,
         state      = building.model_step(actions)
         current_occupancy = next_occupancy
         SU.fix_year_confussion(state)
+        SU.expand_state_next_occup(state, building, hyper_params.next_occ_horizont, ts_diff_in_min, building_occ)
 
         current_energy_Wh = state["energy"] / 360
 
@@ -396,7 +398,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     idx    = 0
     # HINT: a device can be a zone, too
     for agent_name, (controlled_device, controlled_device_type) in building.agent_device_pairing.items():
-        new_agent = agent_constructor( controlled_device_type )
+        new_agent = agent_constructor( controlled_device_type, args )
         new_agent.initialize(
                          name = agent_name,
                          args = args,

@@ -8,7 +8,7 @@ import RLUtilities
 from RandomProcessExt import OrnsteinUhlenbeckProcess
 from Networks import generate_network
 
-def agent_constructor(zone_class, rl_storage_filepath=None):
+def agent_constructor(zone_class, args, rl_storage_filepath=None):
     if zone_class == "VAV with Reheat,Heating,Cooling,NoRL":
         new_agent = AgentNoRL_VAVRhHC()
         new_agent.input_parameters = [
@@ -121,6 +121,10 @@ def agent_constructor(zone_class, rl_storage_filepath=None):
             "Zone Temperature"]
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
+        for n in range(args.next_occ_horizont):
+            new_agent.input_parameters.append(
+                "Zone " + (n+1)*"Next " + "People Count"
+            )
 
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)

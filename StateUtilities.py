@@ -81,6 +81,18 @@ def expand_state_timeinfo_temp(state, building):
         state[f"{r} Zone Temperature"] = state["temperature"][r]
 
 
+def expand_state_next_occup(state, building, n_ts, ts_diff_in_min, building_occ):
+    """
+    Expands the state dictionary by the next n_ts timesteps.
+    """
+    nextdate = state['time']
+    for n in range( n_ts ):
+        nextdate = nextdate + datetime.timedelta(minutes=ts_diff_in_min)
+        new_occ  = building_occ.draw_sample(nextdate)
+        for r in building.room_names:
+            state[r + " Zone " + (n+1)*"Next " + "People Count"] = new_occ[r]['absolute number occupants']
+
+
 def normalized_state_to_tensor(state, building):
     """
     Transforms a state dict to a pytorch tensor.

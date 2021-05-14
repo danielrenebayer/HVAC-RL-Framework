@@ -153,6 +153,10 @@ class Building_5ZoneAirCooled:
             self.global_state_variables.append(f"{r} Zone Temperature")
         for _, varname in self.eplus_extra_states.items():
             self.global_state_variables.append(varname)
+        if not args is None:
+            for n in range(args.next_occ_horizont):
+                for r in self.room_names:
+                    self.global_state_variables.append(r + " Zone " + (n+1)*"Next " + "People Count")
         #
         # make model a instance variable
         self.model = model
