@@ -12,7 +12,7 @@ class Building_5ZoneAirCooled:
         #
         #
         self.room_names = [f'SPACE{i}-1' for i in range(1,6)]
-        self.max_pers_per_room = {"SPACE5-1":24,"SPACE3-1":15,"SPACE1-1":20,"SPACE2-1":12,"SPACE4-1":12}
+        self.max_pers_per_room = {"SPACE5-1":20,"SPACE3-1":11,"SPACE1-1":11,"SPACE2-1":5,"SPACE4-1":5}
         #
         # the pairing which gives, which agent (identified by name) controlles which device (or zone) and what kind of device it is
         if args.algorithm == "ddpg":
