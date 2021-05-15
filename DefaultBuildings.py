@@ -153,10 +153,12 @@ class Building_5ZoneAirCooled:
             self.global_state_variables.append(f"{r} Zone Temperature")
         for _, varname in self.eplus_extra_states.items():
             self.global_state_variables.append(varname)
+        for r in self.room_names:
+            self.global_state_variables.append(f"{r} Zone Rel People Count")
         if not args is None:
             for n in range(args.next_occ_horizont):
                 for r in self.room_names:
-                    self.global_state_variables.append(r + " Zone " + (n+1)*"Next " + "People Count")
+                    self.global_state_variables.append(r + " Zone " + (n+1)*"Next " + "Rel People Count")
         #
         # make model a instance variable
         self.model = model
@@ -202,6 +204,10 @@ class Building_5ZoneAirCooled:
             #    print(f"Action {action_name} from agent in zone {zone} unknown.")
         return actions
 
+    def _expand_relative_occupancy(self, state):
+        for room, max_pers in self.max_pers_per_room.items():
+            state[f"{room} Zone Rel People Count"] = state[f"{room} Zone People Count"] / float(max_pers)
+
     def model_step(self, actions):
         """
         Sends the current actions to the model and obtains the new state.
@@ -216,10 +222,13 @@ class Building_5ZoneAirCooled:
                 return newstate
             else:
                 newstate = self.model.step(actions)
+                self._expand_relative_occupancy(newstate)
                 self.storage_list.append(deepcopy(newstate))
                 return newstate
         else:
-            return self.model.step(actions)
+            new_state = self.model.step(actions)
+            self._expand_relative_occupancy(new_state)
+            return new_state
 
     def model_is_terminate(self):
         if self.storage_mode and self._storage_list_full:
@@ -238,10 +247,13 @@ class Building_5ZoneAirCooled:
                 return self.model_step( [] )
             else:
                 first_state = self.model.reset()
+                self._expand_relative_occupancy(first_state)
                 self.storage_list.append(deepcopy(first_state))
                 return first_state
         else:
-            return self.model.reset()
+            new_state = self.model.reset()
+            self._expand_relative_occupancy(new_state)
+            return new_state
 
 class Building_5ZoneAirCooled_SmallAgents(Building_5ZoneAirCooled):
     def __init__(self, args = None):
