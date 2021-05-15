@@ -31,6 +31,7 @@ def one_single_episode(algorithm,
         RPB_BUFFER_SIZE = 12*24*2 # 2 Tage
         LEARNING_RATE = 0.01
         TARGET_NETWORK_UPDATE_FREQ = 3
+        TS_UNTIL_REGULATION = 1
     else:
         LAMBDA_REWARD_ENERGY = hyper_params.lambda_rwd_energy
         LAMBDA_REWARD_MANU_STP_CHANGES = hyper_params.lambda_rwd_mstpc
@@ -40,6 +41,7 @@ def one_single_episode(algorithm,
         RPB_BUFFER_SIZE = hyper_params.rpb_buffer_size
         LEARNING_RATE   = hyper_params.lr
         TARGET_NETWORK_UPDATE_FREQ = hyper_params.target_network_update_freq
+        TS_UNTIL_REGULATION = hyper_params.ts_until_regulation
     #
     # define the output dict containing status informations
     status_output_dict = {}
@@ -103,7 +105,7 @@ def one_single_episode(algorithm,
                             "control_type":   "Schedule Value",
                             "actuator_key":  f"OCC-SCHEDULE-{zonename}",
                             "value":           next_occupancy[zonename]["relative number occupants"],
-                            "start_time":      state['timestep'] + 1})
+                            "start_time":      state['timestep'] + TS_UNTIL_REGULATION})
 
         #
         # request new actions from all agents
@@ -159,7 +161,7 @@ def one_single_episode(algorithm,
 
         #
         # send agent actions to the building object and obtaion the actions for COBS/eplus
-        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+1 ) )
+        actions.extend( building.obtain_cobs_actions( agent_actions_dict, state["timestep"]+TS_UNTIL_REGULATION ) )
 
         #
         # send actions to EnergyPlus and obtian the new state
