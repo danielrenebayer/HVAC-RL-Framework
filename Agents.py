@@ -39,7 +39,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             'Outdoor Solar Radi Direct',
             "Zone Relative Humidity",
             "Zone CO2",
-            "Zone People Count",
+            "Zone Rel People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
 
@@ -58,7 +58,8 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Relative Humidity",
             "Zone VAV Reheat Damper Position",
             "Zone CO2",
-            "Zone People Count",
+            "Zone Rel People Count",
+            "Zone Next Rel People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = {
             "Zone VAV Reheat Damper Position": (0.1, 1.0, 3),
@@ -70,7 +71,8 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
         new_agent.input_parameters = [
             "Minutes of Day",
             "Day of Week",
-            "Zone People Count"]
+            "Zone Rel People Count",
+            "Zone Next Rel People Count"]
         new_agent.controlled_parameters = {
             "Zone Heating/Cooling-Mean Setpoint": (18.0, 23.0, 6),
             "Zone Heating/Cooling-Delta Setpoint": (2.0, 8.0, 3)}
@@ -80,7 +82,8 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
         new_agent.input_parameters = [
             "Minutes of Day",
             "Day of Week",
-            "Zone People Count"]
+            "Zone Rel People Count",
+            "Zone Next Rel People Count"]
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
 
@@ -101,7 +104,8 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Calendar Week",
             "Outdoor Air Temperature",
             'Outdoor Solar Radi Direct',
-            "SPACE5-1 Zone People Count"]
+            "SPACE5-1 Zone Rel People Count",
+            "SPACE5-1 Zone Next Rel People Count"]
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
 
@@ -112,12 +116,12 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Day of Week",
             "Calendar Week",
             "Outdoor Air Temperature",
-            "Outdoor Air Humidity",
             "Outdoor Wind Speed",
-            'Outdoor Solar Radi Diffuse',
             'Outdoor Solar Radi Direct',
             "Zone Relative Humidity",
-            "Zone People Count",
+            "Zone Rel People Count",
+            "Zone Next Rel People Count",
+            "Zone Next Next Rel People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
@@ -142,7 +146,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             new_agent.input_parameters.extend([
                 f"{zone} Zone Relative Humidity",
                 f"{zone} Zone CO2",
-                f"{zone} Zone People Count",
+                f"{zone} Zone Rel People Count",
                 f"{zone} Zone Temperature"])
         new_agent.controlled_parameters = []
         for zone in [f"SPACE{i}-1" for i in range(1,6)]:
@@ -158,7 +162,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Day of Week"]
         for zone in [f"SPACE{i}-1" for i in range(1,6)]:
             new_agent.input_parameters.extend([
-                f"{zone} Zone People Count"])
+                f"{zone} Zone Rel People Count"])
         new_agent.controlled_parameters = []
         for zone in [f"SPACE{i}-1" for i in range(1,6)]:
             new_agent.controlled_parameters.extend([
@@ -172,7 +176,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Day of Week"]
         for zone in [f"SPACE{i}-1" for i in range(1,6)]:
             new_agent.input_parameters.extend([
-                f"{zone} Zone People Count"])
+                f"{zone} Zone Rel People Count"])
         new_agent.controlled_parameters = ["Zone Heating Setpoint"]
 
     elif zone_class == "VAV with Reheat,Heating,Cooling,RL,VerySmall":
@@ -182,7 +186,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Day of Week",
             #"Outdoor Air Temperature",
             #'Outdoor Solar Radi Direct',
-            "Zone People Count"]
+            "Zone Rel People Count"]
         new_agent.controlled_parameters = [
                 "Zone Heating/Cooling-Mean Setpoint",
                 "Zone Heating/Cooling-Delta Setpoint"]
