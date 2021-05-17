@@ -97,19 +97,29 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
 
     elif zone_class == "SingleSetpoint,SingleAgent,Q,RL":
+        # Requires args.next_occ_horizont >= 2
+        if args.next_occ_horizont < 2:
+            raise AttributeError("Argument next_occ_horizont must be grater then 1, to use this agent!")
         new_agent = QNetwork(zone_class)
         new_agent.input_parameters = [
             "Minutes of Day",
             "Day of Week",
             "Calendar Week",
             "Outdoor Air Temperature",
+            "Outdoor Wind Speed",
             'Outdoor Solar Radi Direct',
+            "SPACE5-1 Zone Relative Humidity",
             "SPACE5-1 Zone Rel People Count",
-            "SPACE5-1 Zone Next Rel People Count"]
+            "SPACE5-1 Zone Next Rel People Count",
+            "SPACE5-1 Zone Next Next Rel People Count",
+            "SPACE5-1 Zone Temperature"]
         new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (14.0, 23.0, 10)}
+            "Zone Heating Setpoint": (15.0, 25.0, 21)}
 
     elif zone_class == "SingleSetpoint,Q,RL":
+        # Requires args.next_occ_horizont >= 2
+        if args.next_occ_horizont < 2:
+            raise AttributeError("Argument next_occ_horizont must be grater then 1, to use this agent!")
         new_agent = QNetwork(zone_class)
         new_agent.input_parameters = [
             "Minutes of Day",
@@ -124,11 +134,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Next Next Rel People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (14.0, 23.0, 10)}
-        for n in range(args.next_occ_horizont):
-            new_agent.input_parameters.append(
-                "Zone " + (n+1)*"Next " + "People Count"
-            )
+            "Zone Heating Setpoint": (15.0, 25.0, 21)}
 
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)
