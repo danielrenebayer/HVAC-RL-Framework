@@ -379,7 +379,7 @@ def one_single_episode(algorithm,
 
 
 
-def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None, episode_offset = 0):
+def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = None, episode_offset = 0, always_eval_episode = False):
     """
     Runs the ddpg algorithm (i.e. the above defined ddpg_episode_mc function)
     for n_episodes runs.
@@ -499,8 +499,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         hyper_params   = args,
                         episode_number = n_episode,
                         sqloutput      = sqloutput,
-                        extended_logging   = (n_episode+1) % args.network_storage_frequency == 0,
-                        evaluation_episode = (n_episode+1) % args.network_storage_frequency == 0,
+                        extended_logging   = (n_episode+1) % args.network_storage_frequency == 0 or always_eval_episode,
+                        evaluation_episode = (n_episode+1) % args.network_storage_frequency == 0 or always_eval_episode,
                         add_random_process_in_eval_epoch = args.add_ou_in_eval_epoch,
                         ts_diff_in_min = ts_diff_in_min,
                         rpb = rpb)
