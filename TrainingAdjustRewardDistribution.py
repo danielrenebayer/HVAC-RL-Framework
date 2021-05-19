@@ -94,8 +94,8 @@ def main(args = None):
     best_jsd_value  = []
     best_jsd_rscale = []
     best_jsd_hist   = []
-    #for reward_scale in np.arange(0.05, 1.75, 0.05):
-    for reward_scale in np.arange(0.005, 0.1, 0.004):
+    for reward_scale in np.arange(0.05, 1.75, 0.05):
+    #for reward_scale in np.arange(0.005, 0.1, 0.004):
         sqloutput = SQLOutput(os.path.join(eval_dir, f"ouputs-{n_run}.sqlite"), building)
         sqloutput.initialize()
         #
@@ -138,6 +138,13 @@ def main(args = None):
     }
     f = open(os.path.join(eval_dir, "best-results.pickle"), "wb")
     pickle.dump(optimal_settings, f)
+    f.close()
+    f = open(os.path.join(eval_dir, "best-reward-scale.txt"), "w")
+    f.write(str(best_jsd_rscale[position]))
+    f.close()
+    f = open(os.path.join(eval_dir, "name-of-used-model.txt"), "w")
+    load_path = os.path.abspath(args.load_models_from_path)
+    f.write(f"{load_path}/episode_{args.load_models_episode}_agent_0")
     f.close()
 
 
