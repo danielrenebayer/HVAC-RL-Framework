@@ -34,6 +34,7 @@ def get_argparser():
     parser.add_argument('--ou_mu', type=float, default=0.0)
     parser.add_argument('--ou_sigma', type=float, default=0.3)
     parser.add_argument('--ou_update_freq', type=int, default=1, help="Number of steps until obtaining the next sample from the OU-process")
+    parser.add_argument('--epsilon_initial', type=float, default=1.0, help="The initial value of epsilon.")
     parser.add_argument('--epsilon', type=float, default=0.05, help="The final epsilon value for random sampling in DDQN learning.")
     parser.add_argument('--epsilon_final_step', type=int, default=100, help="The timestep at wich the minimal epsilon value (as defined in epsilon-parameter) should be reached, only for DDQN learning.")
     parser.add_argument('--episodes_count', type=int, default=100, help="Number of episodes to train on")

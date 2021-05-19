@@ -475,7 +475,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
         if args.algorithm == "ddqn":
             # set epsilon for all agents
-            epsilon = max(args.epsilon, np.exp(n_episode * np.log(args.epsilon)/args.epsilon_final_step))
+            epsilon = max(args.epsilon, args.epsilon_initial*np.exp(n_episode * (np.log(args.epsilon)-np.log(args.epsilon_initial))/args.epsilon_final_step))
             for agent in agents:
                 agent.epsilon = epsilon
         elif args.algorithm == "ddpg":
