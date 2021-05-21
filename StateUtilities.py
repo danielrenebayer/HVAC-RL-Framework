@@ -11,16 +11,17 @@ variable_ranges = {
     "Calendar Week":           (  1.0,   53.0),
     "Outdoor Air Temperature": (-20.0,   40.0), 
     "Outdoor Air Humidity":    (  0.0,  100.0),
-    "Outdoor Wind Speed":      (  0.0,   15.0), # TODO: search for true maximal value
+    "Outdoor Wind Speed":      (  0.0,   15.0),
     'Outdoor Wind Direction':  (  0.0,  360.0),
-    'Outdoor Solar Radi Diffuse': (0.0,1000.0),
-    'Outdoor Solar Radi Direct':  (0.0, 200.0),
+    'Outdoor Solar Radi Diffuse': (0.0, 350.0),
+    'Outdoor Solar Radi Direct':  (0.0,1000.0),
     "Zone VAV Reheat Damper Position": (0.15,1.0),
     "Zone Relative Humidity":  (  0.0,  100.0),
-    "Zone CO2":                (410.0, 5000.0),
-    "Zone Temperature":        ( 10.0,   40.0),
+    "Zone CO2":                (410.0, 2000.0),
+    "Zone Temperature":        ( 10.0,   34.0),
     "Zone Heating/Cooling-Mean Setpoint": ( 14.0,30.0),
-    "Zone Heating/Cooling-Delta Setpoint":(  0.1,10.0)
+    "Zone Heating/Cooling-Delta Setpoint":(  0.1,10.0),
+    "Rel People Count":        (  0.0,    1.0)
 }
 
 
