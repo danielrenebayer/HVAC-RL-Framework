@@ -41,15 +41,11 @@ def backtransform_variable(vi, varname):
 
 
 def normalize_variables_in_dict(vardict, inplace=False):
-    if inplace:
-        outdict = vardict
-    else:
-        outdict = deepcopy(vardict)
-
-    for k in outdict.keys():
+    outdict = {}
+    for k in vardict.keys():
         for known_variable in variable_ranges.keys():
             if k.endswith(known_variable):
-                outdict[k] = normalize_variable( outdict[k], known_variable )
+                outdict[k] = normalize_variable( vardict[k], known_variable )
                 break
     return outdict
 

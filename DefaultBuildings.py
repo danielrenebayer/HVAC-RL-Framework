@@ -152,7 +152,8 @@ class Building_5ZoneAirCooled:
         for r in self.room_names:
             self.global_state_variables.append(f"{r} Zone Temperature")
         for _, varname in self.eplus_extra_states.items():
-            self.global_state_variables.append(varname)
+            if not varname.endswith("Zone People Count"):
+                self.global_state_variables.append(varname)
         for r in self.room_names:
             self.global_state_variables.append(f"{r} Zone Rel People Count")
         if not args is None:
