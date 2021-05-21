@@ -92,7 +92,8 @@ def expand_state_next_occup(state, building, n_ts, ts_diff_in_min, building_occ)
         nextdate = nextdate + datetime.timedelta(minutes=ts_diff_in_min)
         new_occ  = building_occ.draw_sample(nextdate)
         for r in building.room_names:
-            state[r + " Zone " + (n+1)*"Next " + "Rel People Count"] = new_occ[r]['relative number occupants'].astype(np.float32)
+            #state[r + " Zone " + (n+1)*"Next " + "Rel People Count"] = new_occ[r]['relative number occupants'].astype(np.float32)
+            state[r + " Zone " + (n+1)*"Next " + "Rel People Count"] = float(new_occ[r]['relative number occupants'])
 
 
 def normalized_state_to_tensor(state, building):
