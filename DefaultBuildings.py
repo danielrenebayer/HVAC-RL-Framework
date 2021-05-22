@@ -463,9 +463,26 @@ class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
         super().__init__(args)
         #
         if args.algorithm == "ddqn":
-            self.agent_device_pairing = {f"Agent SPACE{i}-1":
-                                         (f"SPACE{i}-1", "SingleSetpoint,Q,RL")
-                                     for i in range(1,6)}
+            if args.single_setpoint_agent_count == "all":
+                self.agent_device_pairing = {f"Agent SPACE{i}-1":
+                                            (f"SPACE{i}-1", "SingleSetpoint,Q,RL")
+                                            for i in range(1,6)}
+            elif args.single_setpoint_agent_count == "one":
+                self.agent_device_pairing = {
+                    "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE3-1": ("SPACE3-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                }
+            else:
+                self.agent_device_pairing = {
+                    "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE3-1": ("SPACE3-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                }
         else:
             raise AttributeError(f"{args.algorithm} is not available for the class Building_5ZoneAirCooled_SingleSetpoint")
 
