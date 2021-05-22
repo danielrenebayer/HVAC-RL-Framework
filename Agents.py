@@ -710,8 +710,14 @@ class QNetwork:
         torch.save(self.model_target, os.path.join(storage_dir, prefix + "_model_target.pickle"))
 
     def _load_models_from_disk(self, storage_dir, prefix=""):
-        self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
-        self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        if os.path.exists(os.path.join(storage_dir, prefix + "_model_actor.pickle")):
+            self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
+            self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        else:
+            # try to load model of agent 0, if not existing. If this does not work
+            # it will raise an error
+            self.model_actor = torch.load(os.path.join(storage_dir, prefix[:-1] + "0_model_actor.pickle"))
+            self.model_target= torch.load(os.path.join(storage_dir, prefix[:-1] + "0_model_target.pickle"))
         self._init_optimizer()
         self._init_cuda()
 
