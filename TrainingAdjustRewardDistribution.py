@@ -85,7 +85,7 @@ def main(args = None):
 
     print("Compute target distribution")
     dfs = convert_sqlite_to_df(sqloutput.db)
-    target_reward_hist, hist_labels = np.histogram(dfs["sees"].loc[:, "reward"], bins=30, range=(-10,2))
+    target_reward_hist, hist_labels = np.histogram(dfs["sees"].loc[:, "reward"], bins=20, range=(-8,0.1), density=True)
     sqloutput.db.close()
 
     #
@@ -94,8 +94,10 @@ def main(args = None):
     best_jsd_value  = []
     best_jsd_rscale = []
     best_jsd_hist   = []
-    for reward_scale in np.arange(0.05, 1.75, 0.05):
+    #for reward_scale in np.arange(0.05, 1.75, 0.05):
     #for reward_scale in np.arange(0.005, 0.1, 0.004):
+    # run one episode with reward scale 1 and then scale again in a loop
+    for _ in range(1):
         sqloutput = SQLOutput(os.path.join(eval_dir, f"ouputs-{n_run}.sqlite"), building)
         sqloutput.initialize()
         #
@@ -104,18 +106,19 @@ def main(args = None):
         #
         # Run the simulation
         args.reward_function = "sum_energy_mstpc"
-        args.reward_scale = reward_scale
+        args.reward_scale    = 1
         run_for_n_episodes(1, building, building_occ, args, sqloutput, episode_offset, True)
         sqloutput.db.commit()
-        # Compute target distribution
+        # Compute current distribution
         dfs = convert_sqlite_to_df(sqloutput.db)
-        current_reward_hist, _ = np.histogram(dfs["sees"].loc[:, "reward"], bins=30, range=(-10,2))
-        jsd = scipy.spatial.distance.jensenshannon(target_reward_hist, current_reward_hist)
-        #
-        best_jsd_value.append(jsd)
-        best_jsd_rscale.append(reward_scale)
-        best_jsd_hist.append(current_reward_hist)
-        print(f"Run {n_run:4}: reward scale = {reward_scale:6.5f}, JSD = {jsd:11.8f}")
+        for reward_scale in np.arange(0.01, 2.95, 0.01):
+            current_reward_hist, _ = np.histogram(dfs["sees"].loc[:, "reward"]*reward_scale, bins=20, range=(-8,0.1), density=True)
+            jsd = scipy.spatial.distance.jensenshannon(target_reward_hist, current_reward_hist)
+            #
+            best_jsd_value.append(jsd)
+            best_jsd_rscale.append(reward_scale)
+            best_jsd_hist.append(current_reward_hist)
+            print(f"reward scale = {reward_scale:6.5f}, JSD = {jsd:11.8f}")
         #
         sqloutput.db.close()
         n_run += 1
@@ -134,6 +137,9 @@ def main(args = None):
         "best_jds":best_jsd_value[position],
         "best_reward_scale":best_jsd_rscale[position],
         "labels":hist_labels,
+        "all_jsds":best_jsd_value,
+        "all_jsds_rscales":best_jsd_rscale,
+        "reward_hist_for_scale_1":np.histogram(dfs["sees"].loc[:, "reward"], bins=20, range=(-8,0.1), density=True),
         "all_rewards":best_jsd_hist
     }
     f = open(os.path.join(eval_dir, "best-results.pickle"), "wb")
