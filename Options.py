@@ -58,7 +58,7 @@ def get_argparser():
     parser.add_argument('--model', type=str, default="Building_5ZoneAirCooled", choices=[
         "Building_5ZoneAirCooled", "Building_5ZoneAirCooled_SmallAgents",
         "Building_5ZoneAirCooled_SingleSetpoint", "Building_5ZoneAirCooled_SingleSetpoint_SmallAgents",
-        "Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent",
+        "Building_5ZoneAirCooled_SingleSetpoint_SingleBIGAgent",
         "Building_5ZoneAirCooled_SingleSetpoint_SingleAgent",
         "Building_5ZoneAirCooled_SingleAgent", "Building_5ZoneAirCooled_SmallSingleAgent"])
     parser.add_argument('--number_occupants', type=int, default=35)

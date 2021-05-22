@@ -405,19 +405,19 @@ class Building_5ZoneAirCooled_SingleSetpoint_SingleAgent(Building_5ZoneAirCooled
         return actions
 
 
-class Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent(Building_5ZoneAirCooled):
+class Building_5ZoneAirCooled_SingleSetpoint_SingleBIGAgent(Building_5ZoneAirCooled):
     def __init__(self, args = None):
         #
         super().__init__(args)
         #
         if args.algorithm == "ddqn":
             self.agent_device_pairing = {"MainAgent":
-                                             ("all", "SingleSetpoint,SingleAgent,Q,RL,VerySmall2")
+                                             ("all", "SingleSetpoint,SingleAgent,Q,RL,BIG")
                                         }
-        elif args.algorithm == "ddpg":
-            self.agent_device_pairing = {"MainAgent":
-                                            ("all", "5ZoneAirCooled,SingleAgent,SingleSetpoint,RL,VerySmall")
-                                        }
+        #elif args.algorithm == "ddpg":
+        #    self.agent_device_pairing = {"MainAgent":
+        #                                    ("all", "5ZoneAirCooled,SingleAgent,SingleSetpoint,RL,VerySmall")
+        #                                }
         else:
             raise AttributeError(f"{args.algorithm} is not available for the class Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent")
 
@@ -441,7 +441,7 @@ class Building_5ZoneAirCooled_SingleSetpoint_SingleSmallAgent(Building_5ZoneAirC
                                 "value": 1,
                                 "start_time": next_timestep})
                 #
-                heating_temp   = ag_actions["Zone Heating Setpoint"]
+                heating_temp   = ag_actions[f"{zone} Zone Heating Setpoint"]
                 cooling_offset = 12
                 actions.append({"value":      heating_temp,
                                 "start_time": next_timestep,

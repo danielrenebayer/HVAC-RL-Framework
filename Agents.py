@@ -87,14 +87,26 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
         new_agent.controlled_parameters = {
             "Zone Heating Setpoint": (14.0, 23.0, 10)}
 
-    elif zone_class == "SingleSetpoint,SingleAgent,Q,RL,VerySmall2":
+    elif zone_class == "SingleSetpoint,SingleAgent,Q,RL,BIG":
+        # Requires args.next_occ_horizont >= 2
+        if args.next_occ_horizont < 2:
+            raise AttributeError("Argument next_occ_horizont must be grater then 1, to use this agent!")
         new_agent = QNetwork(zone_class)
         new_agent.input_parameters = [
             "Minutes of Day",
             "Day of Week",
+            "Outdoor Air Temperature",
+            "Outdoor Wind Speed",
             'Outdoor Solar Radi Direct']
-        new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (14.0, 23.0, 10)}
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.input_parameters.extend([
+                f"{zone} Zone Rel People Count",
+                f"{zone} Zone Next Rel People Count",
+                f"{zone} Zone Next Next Rel People Count",
+                f"{zone} Zone Temperature"])
+        new_agent.controlled_parameters = {}
+        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
+            new_agent.controlled_parameters[f"{zone} Zone Heating Setpoint"] = (15.7, 23.2, 5)
 
     elif zone_class == "SingleSetpoint,SingleAgent,Q,RL":
         # Requires args.next_occ_horizont >= 2
@@ -174,16 +186,6 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             new_agent.controlled_parameters.extend([
                 f"{zone} Zone Heating/Cooling-Mean Setpoint",
                 f"{zone} Zone Heating/Cooling-Delta Setpoint"])
-
-    elif zone_class == "5ZoneAirCooled,SingleAgent,SingleSetpoint,RL,VerySmall":
-        new_agent = AgentRL(zone_class)
-        new_agent.input_parameters = [
-            "Minutes of Day",
-            "Day of Week"]
-        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
-            new_agent.input_parameters.extend([
-                f"{zone} Zone Rel People Count"])
-        new_agent.controlled_parameters = ["Zone Heating Setpoint"]
 
     elif zone_class == "VAV with Reheat,Heating,Cooling,RL,VerySmall":
         new_agent = AgentRL(zone_class)
