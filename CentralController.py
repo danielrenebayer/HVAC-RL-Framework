@@ -124,6 +124,7 @@ def one_single_episode(algorithm,
                     agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_actions[idx])
             else:
                 for agent in agents:
+                  if agent.type == "RL":
                     new_action = agent.next_action(norm_state_ten, add_random_process)
                     agent_actions_list.append( new_action )
                     agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_action)
@@ -133,6 +134,8 @@ def one_single_episode(algorithm,
                                   "agent_action": new_action,
                                   "agent internal input tensor": vo_ipt.detach()}
                         status_output_dict["verbose_output"].append(vodict)
+                  else:
+                    agent_actions_dict[agent.name] = agent.step(state)
             # no backtransformation of variables needed, this is done in agents definition already
             #
             # output Q values in eval episode if selected
@@ -148,12 +151,15 @@ def one_single_episode(algorithm,
 
         elif algorithm == "ddpg":
             for agent in agents:
+              if agent.type == "RL":
                 new_action = agent.step_tensor(norm_state_ten,
                                                use_actor = True,
                                                add_ou    = add_ou_process)
                 agent_actions_list.append( new_action )
                 new_action_dict = agent.output_tensor_to_action_dict(new_action)
                 agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
+              else:
+                agent_actions_dict[agent.name] = agent.step(state)
 
         elif algorithm == "baseline_rule-based":
             for agent in agents:
@@ -242,6 +248,8 @@ def one_single_episode(algorithm,
                 output_ag_frobnorm_bia_list.append( ag_fnorm2 )
             else:
                 for agent_id, agent in enumerate(agents):
+                    if not agent.type == "RL":
+                        continue
                     #
                     # compute y (i.e. the TD-target)
                     #  Hint: s_{i+1} <- state2; s_i <- state1
@@ -328,6 +336,7 @@ def one_single_episode(algorithm,
     if episode_number % TARGET_NETWORK_UPDATE_FREQ == 0:
         if algorithm == "ddqn":
             for agent in agents:
+                if agent.type != "RL": continue
                 agent.copy_weights_to_target()
             status_output_dict["target_network_update"] = True
         elif algorithm == "ddpg":

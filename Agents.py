@@ -220,6 +220,7 @@ class AgentRL:
         self.controlled_element = ""
         self.optimizer = None
         self.ou_process= None
+        self.type = "RL"
 
     def initialize(self, name, controlled_element, global_state_keys, args = None):
         """
@@ -472,6 +473,7 @@ class QNetwork:
         self.name = ""
         self.controlled_element = ""
         self.optimizer = None
+        self.type = "RL"
 
     def initialize(self, name, controlled_element, global_state_keys, args = None, load_path = "", load_prefix = ""):
         """
@@ -734,6 +736,7 @@ class AgentNoRL:
         self.input_parameters = []
         self.controlled_parameters = []
         self.ctrl_fx = None
+        self.type = "NoRL"
 
     def step(self, current_state):
         #
@@ -752,6 +755,12 @@ class AgentNoRL:
         for idx, cp in enumerate(self.controlled_parameters):
             output_dic[cp] = output_vec[idx]
         return output_dic
+
+    def save_models_to_disk(self, storage_dir="", prefix=""):
+        """
+        This function only exists to be compatible to RL agents.
+        """
+        pass
 
 
 
