@@ -548,50 +548,5 @@ class Building_5ZoneAirCooled_SingleAgent(Building_5ZoneAirCooled):
                                 "actuator_key":   zone})
         return actions
 
-class Building_5ZoneAirCooled_SmallSingleAgent(Building_5ZoneAirCooled):
-    def __init__(self, args = None):
-        #
-        super().__init__(args)
-        #
-        # the pairing which gives, which agent (identified by name) controlles which device (or zone) and what kind of device it is
-        self.agent_device_pairing = {"MainAgent":
-                                         ("all", "5ZoneAirCooled,SingleAgent,RL,VerySmall")
-                                     }
-
-    def obtain_cobs_actions(self, agent_actions, next_timestep):
-        """
-        Returns a list of actions that can be passed to cobs.
-
-        The agent_actions dict is expected to have the format:
-        {agent_name: {controlled_parameter: new_value}}
-        """
-        actions = []
-        for agent_name, ag_actions in agent_actions.items():
-            for zone in self.room_names:
-                # set damper position to 1
-                damper_pos_val = 1
-                actions.append({"priority": 0,
-                                "component_type":"Schedule:Constant",
-                                "control_type":  "Schedule Value",
-                                "actuator_key": f"{zone} VAV Customized Schedule",
-                                "value": damper_pos_val,
-                                "start_time": next_timestep})
-                mean_temp_sp = ag_actions[f"{zone} Zone Heating/Cooling-Mean Setpoint"]
-                delta = ag_actions[f"{zone} Zone Heating/Cooling-Delta Setpoint"]
-                if delta < 0.1: delta = 0.1
-                actions.append({"value":      mean_temp_sp - delta,
-                                "start_time": next_timestep,
-                                "priority":   0,
-                                "component_type": "Zone Temperature Control",
-                                "control_type":   "Heating Setpoint",
-                                "actuator_key":   zone})
-                actions.append({"value":      mean_temp_sp + delta,
-                                "start_time": next_timestep,
-                                "priority":   0,
-                                "component_type": "Zone Temperature Control",
-                                "control_type":   "Cooling Setpoint",
-                                "actuator_key":   zone})
-        return actions
-
 
 

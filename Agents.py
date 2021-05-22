@@ -173,20 +173,6 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
                 f"{zone} Zone Heating/Cooling-Mean Setpoint",
                 f"{zone} Zone Heating/Cooling-Delta Setpoint"])
 
-    elif zone_class == "5ZoneAirCooled,SingleAgent,RL,VerySmall":
-        new_agent = AgentRL(zone_class)
-        new_agent.input_parameters = [
-            "Minutes of Day",
-            "Day of Week"]
-        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
-            new_agent.input_parameters.extend([
-                f"{zone} Zone Rel People Count"])
-        new_agent.controlled_parameters = []
-        for zone in [f"SPACE{i}-1" for i in range(1,6)]:
-            new_agent.controlled_parameters.extend([
-                f"{zone} Zone Heating/Cooling-Mean Setpoint",
-                f"{zone} Zone Heating/Cooling-Delta Setpoint"])
-
     elif zone_class == "VAV with Reheat,Heating,Cooling,RL,VerySmall":
         new_agent = AgentRL(zone_class)
         new_agent.input_parameters = [
