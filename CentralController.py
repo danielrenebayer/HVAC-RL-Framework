@@ -66,7 +66,7 @@ def one_single_episode(algorithm,
     output_ag_frobnorm_bia_list = []
     output_n_stp_ch  = []
     output_energy_Wh = []
-    if not algorithm == "ddpg":
+    if not algorithm == "ddpg" or not extended_logging:
         output_q_st2_list= [0 for _ in agents]
         output_J_mean_list=[0 for _ in agents]
         output_cr_frobnorm_mat_list = [0 for _ in agents]
@@ -155,11 +155,12 @@ def one_single_episode(algorithm,
               if agent.type == "RL":
                 new_action = agent.step_tensor(norm_state_ten,
                                                use_actor = True,
-                                               add_ou    = add_ou_process)
+                                               add_ou    = add_random_process)
                 agent_actions_list.append( new_action )
                 new_action_dict = agent.output_tensor_to_action_dict(new_action)
                 agent_actions_dict[agent.name] = SU.backtransform_variables_in_dict(new_action_dict, inplace=True)
               else:
+                agent_actions_list.append( agent.step_tensor(norm_state_ten) )
                 agent_actions_dict[agent.name] = agent.step(state)
 
         elif algorithm == "baseline_rule-based":
@@ -283,6 +284,8 @@ def one_single_episode(algorithm,
             #
             # loop over all [agent, critic]-pairs
             for agent, critic in zip(agents, critics):
+                if agent.type != "RL":
+                    continue
                 #
                 # compute y
                 #  Hint: s_{i+1} <- state2; s_i <- state1
@@ -313,12 +316,13 @@ def one_single_episode(algorithm,
                 output_J_mean_list.append(float(policy_J_mean.detach().numpy()))
                 # compute and store frobenius norms for the weights
                 cr_fnorm1, cr_fnorm2, ag_fnorm1, ag_fnorm2 = 0, 0, 0, 0
-                for p in critic.model.parameters():
-                    if len(p.shape) == 1: cr_fnorm2 += float(p.cpu().norm().detach().cpu().numpy())
-                    else: cr_fnorm1 += float(p.norm().detach().cpu().numpy())
-                for p in agent.model_actor.parameters():
-                    if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
-                    else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
+                if extended_logging:
+                    for p in critic.model.parameters():
+                        if len(p.shape) == 1: cr_fnorm2 += float(p.cpu().norm().detach().cpu().numpy())
+                        else: cr_fnorm1 += float(p.norm().detach().cpu().numpy())
+                    for p in agent.model_actor.parameters():
+                        if len(p.shape) == 1: ag_fnorm2 += float(p.norm().detach().cpu().numpy())
+                        else: ag_fnorm1 += float(p.norm().detach().cpu().numpy())
                 output_cr_frobnorm_mat_list.append( cr_fnorm1 )
                 output_cr_frobnorm_bia_list.append( cr_fnorm2 )
                 output_ag_frobnorm_mat_list.append( ag_fnorm1 )
@@ -349,6 +353,7 @@ def one_single_episode(algorithm,
                 critic.update_target_network(TAU_TARGET_NETWORKS)
             # update target network for actor
             for agent in agents:
+                if agent.type != "RL": continue
                 agent.update_target_network(TAU_TARGET_NETWORKS)
             status_output_dict["target_network_update"] = True
 
@@ -429,11 +434,10 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
     critics = []
     if args.algorithm == "ddpg":
         ciritic_input_variables=["Minutes of Day","Day of Week","Calendar Week",
-                                 "Outdoor Air Temperature","Outdoor Air Humidity",
-                                 "Outdoor Wind Speed","Outdoor Wind Direction",
-                                 "Outdoor Solar Radi Diffuse","Outdoor Solar Radi Direct"]
-        for vartype in ["Zone Temperature","Zone People Count",
-                        "Zone Relative Humidity",
+                                 "Outdoor Air Temperature",
+                                 "Outdoor Wind Speed","Outdoor Solar Radi Direct"]
+        for vartype in ["Zone Temperature","Zone Rel People Count",
+                        "Zone Next Rel People Count", "Zone Next Next Rel People Count",
                         "Zone VAV Reheat Damper Position","Zone CO2"]:
             ciritic_input_variables.extend( [f"SPACE{k}-1 {vartype}" for k in range(1,6)] )
         for agent in agents:
@@ -486,12 +490,12 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
 
         t_start = timeit.default_timer()
 
-        if args.algorithm == "ddqn":
-            # set epsilon for all agents
-            epsilon = max(args.epsilon, args.epsilon_initial*np.exp(n_episode * (np.log(args.epsilon)-np.log(args.epsilon_initial))/args.epsilon_final_step))
-            for agent in agents:
-                agent.epsilon = epsilon
-        elif args.algorithm == "ddpg":
+        # set epsilon for all agents
+        epsilon = max(args.epsilon, args.epsilon_initial*np.exp(n_episode * (np.log(args.epsilon)-np.log(args.epsilon_initial))/args.epsilon_final_step))
+        for agent in agents:
+            agent.epsilon = epsilon
+
+        if args.algorithm == "ddpg":
             # set ou-parameters for all agents
             ou_mu    = 0.0
             ou_theta = max(args.ou_theta, np.exp(n_episode * np.log(args.ou_theta / 3) / args.epsilon_final_step))
@@ -518,9 +522,8 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
                         ts_diff_in_min = ts_diff_in_min,
                         rpb = rpb)
 
-        if args.algorithm == "ddqn":
-            status_output_dict["epsilon"] = epsilon
-        elif args.algorithm == "ddpg":
+        status_output_dict["epsilon"] = epsilon
+        if args.algorithm == "ddpg":
             status_output_dict["ou_theta"] = ou_theta
             status_output_dict["ou_sigma"] = ou_sigma
             status_output_dict["ou_mu"]    = ou_mu
@@ -540,7 +543,7 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
         t_diff = t_end - t_start
         status_output_dict["t_diff"]  = t_diff
         print(f"Episode {n_episode:5} finished: mean reward = {status_output_dict['reward_mean']:9.4f}, ", end="")
-        if args.algorithm == "ddqn": print(f"epsilon = {epsilon:.4f}, ", end="")
+        print(f"epsilon = {epsilon:.4f}, ", end="")
         print(f"time = {t_diff:6.1f}s, random process = {status_output_dict['random_process_addition']}, eval. epoch = {status_output_dict['evaluation_epoch']}, target w. upd. = {status_output_dict['target_network_update']}")
         # store detailed output
         if not sqloutput is None:
