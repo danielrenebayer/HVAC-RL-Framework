@@ -8,6 +8,7 @@ import torch
 import numpy as np
 
 import RLUtilities
+from Networks import generate_network
 
 class CriticMergeAndOnlyFC:
     """
@@ -40,47 +41,28 @@ class CriticMergeAndOnlyFC:
         self.input_state_var_size = len(input_variables)
         self.input_agent_var_size = len(self.agent_variables)
         self.input_size  = self.input_state_var_size + self.input_agent_var_size
-        hidden_size      = 40 if args is None else args.critic_hidden_size
-        self.hidden_size = hidden_size
         self.lr          = 0.001 if args is None else args.lr
         self.w_l2        = 0.00001 if args is None else args.critic_w_l2
         self.use_cuda    = torch.cuda.is_available() if args is None else args.use_cuda
         self.optimizer_name = "adam" if args is None else args.optimizer
-        if not args is None and args.critic_hidden_activation == "LeakyReLU":
-            activation_fx     = torch.nn.LeakyReLU
-        else:
-            activation_fx     = torch.nn.Tanh
-        #if not args is None and args.critic_last_activation == "LeakyReLU":
-        #    activation_fx_end = torch.nn.LeakyReLU
-        #else:
-        #    activation_fx_end = torch.nn.Tanh
-        self.model = torch.nn.Sequential(
-            torch.nn.Linear(self.input_size, hidden_size),
-            activation_fx(),
-            torch.nn.Linear(hidden_size, hidden_size),
-            activation_fx(),
-            torch.nn.Linear(hidden_size, 1)
+
+        self.model = generate_network(
+            args.agent_network,
+            self.input_size,
+            1,
+            args.use_layer_normalization
         )
-        self.model_target = torch.nn.Sequential(
-            torch.nn.Linear(self.input_size, hidden_size),
-            activation_fx(),
-            torch.nn.Linear(hidden_size, hidden_size),
-            activation_fx(),
-            torch.nn.Linear(hidden_size, 1)
+        self.model_target = generate_network(
+            args.agent_network,
+            self.input_size,
+            1,
+            args.use_layer_normalization
         )
         # change initialization
-        for m_param in self.model.parameters():
-            if len(m_param.shape) == 1:
-                # other initialization for biases
-                torch.nn.init.constant_(m_param, 0.001)
-            else:
-                torch.nn.init.normal_(m_param, 0.0, 1.0)
+        RLUtilities.init_model(self.model, args)
         # copy weights from Q -> target Q
         for m_param, mtarget_param in zip(self.model.parameters(), self.model_target.parameters()):
             mtarget_param.data.copy_(m_param.data)
-        # init optimizer and loss
-        self._init_optimizer()
-        self.loss      = torch.nn.MSELoss()
         # define the transformation matrix
         trafo_list = []
         for input_param in input_variables:
@@ -91,6 +73,9 @@ class CriticMergeAndOnlyFC:
         self.trafo_matrix = torch.stack(trafo_list).T
         # cuda?
         self._init_cuda()
+        # init optimizer and loss
+        self._init_optimizer()
+        self.loss = torch.nn.MSELoss()
 
 
     def _init_optimizer(self):
@@ -112,7 +97,6 @@ class CriticMergeAndOnlyFC:
             self.model_target = self.model_target.to(0)
             self.model = self.model.to(0)
             self.trafo_matrix = self.trafo_matrix.to(0)
-            self._init_optimizer()
 
 
     def compute_loss_and_optimize(self, q_tensor, y_tensor, no_backprop = False):
@@ -232,6 +216,6 @@ class CriticMergeAndOnlyFC:
     def load_models_from_disk(self, storage_dir, prefix=""):
         self.model = torch.load(os.path.join(storage_dir, prefix + "_model.pickle"))
         self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
-        self._init_optimizer()
         self._init_cuda()
+        self._init_optimizer()
 
