@@ -47,13 +47,13 @@ class CriticMergeAndOnlyFC:
         self.optimizer_name = "adam" if args is None else args.optimizer
 
         self.model = generate_network(
-            args.agent_network,
+            args.critic_network,
             self.input_size,
             1,
             args.use_layer_normalization
         )
         self.model_target = generate_network(
-            args.agent_network,
+            args.critic_network,
             self.input_size,
             1,
             args.use_layer_normalization

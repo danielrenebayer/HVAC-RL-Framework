@@ -42,6 +42,7 @@ def get_argparser():
     parser.add_argument('--episode_length', type=int, default=30, help="The length of an episode in days")
     parser.add_argument('--episode_start_day', type=int, default=1)
     parser.add_argument('--episode_start_month', type=int, default=7)
+    parser.add_argument('--critic_network', type=str, default="2HiddenLayer,FastPyramid")
     parser.add_argument('--agent_network', type=str, default="2HiddenLayer,Trapezium")
     parser.add_argument('--agent_init_fn', type=str, default="xavier_normal", choices=["xavier_normal", "he_normal", "normal"])
     parser.add_argument('--agent_init_gain', type=float, default=0.8, help="Gain for Xavier normal initialization")

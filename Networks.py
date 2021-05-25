@@ -42,6 +42,23 @@ def generate_network(network_type, input_size, output_size, use_layer_norm = Fal
             model["tanh-3"]  = torch.nn.Tanh()
         return torch.nn.Sequential(model)
 
+    if network_type == "2HiddenLayer,FastPyramid":
+        hidden_size1 = input_size // 3
+        hidden_size2 = (hidden_size1 + 3*output_size) // 4
+        model = collections.OrderedDict()
+        model["linear-1"]    = torch.nn.Linear(input_size,   hidden_size1)
+        if use_layer_norm:
+            model["lnorm-1"] = torch.nn.LayerNorm(hidden_size1)
+        model["leakyReLU-1"] = torch.nn.LeakyReLU()
+        model["linear-2"]    = torch.nn.Linear(hidden_size1, hidden_size2)
+        if use_layer_norm:
+            model["lnorm-2"] = torch.nn.LayerNorm(hidden_size2)
+        model["leakyReLU-2"] = torch.nn.LeakyReLU()
+        model["linear-3"]    = torch.nn.Linear(hidden_size2, output_size)
+        if add_tanh:
+            model["tanh-3"]  = torch.nn.Tanh()
+        return torch.nn.Sequential(model)
+
     if network_type == "1HiddenBigLayer":
         hidden_size1 = 3 * max(input_size, output_size)
         model = collections.OrderedDict()
