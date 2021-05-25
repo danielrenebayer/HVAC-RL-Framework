@@ -208,7 +208,10 @@ class AgentRL:
         self.ou_process= None
         self.type = "RL"
 
-    def initialize(self, name, controlled_element, global_state_keys, args = None):
+    def initialize(self, name, controlled_element, global_state_keys,
+                    args = None,
+                    load_path = "",
+                    load_prefix = ""):
         """
         Initializes the agent.
         This function should be callen after the creation of the object and the
@@ -224,6 +227,8 @@ class AgentRL:
             The list of all keys (in the correct order, as they occur in the input tensor later!) in the state.
         args : argparse
             Additional arguments, optional.
+        load_path and load_prefix
+            See QNetwork.initialize for details
         """
         if len(self.input_parameters) == 0 or len(self.controlled_parameters) == 0:
             raise RuntimeError("The number of input and output parameters has to be greater than 0")
@@ -232,54 +237,26 @@ class AgentRL:
         self.controlled_element = controlled_element
         self.use_cuda = torch.cuda.is_available() if args is None else args.use_cuda
         self.lr     = 0.001 if args is None else args.lr
+        self.epsilon  = 0.05 if args is None else args.epsilon
         self.ou_theta = 0.3 if args is None else args.ou_theta
         self.ou_mu    = 0.0 if args is None else args.ou_mu
         self.ou_sigma = 0.3 if args is None else args.ou_sigma
         self.w_l2     = 0.00001 if args is None else args.agent_w_l2
         self.ou_update_freq = 1 if args is None else args.ou_update_freq
         self.optimizer_name = "adam" if args is None else args.optimizer
+        self.agent_network_name = "2HiddenLayer,Trapezium" if args is None else args.agent_network
         self._stepts_since_last_ou_update = self.ou_update_freq
         self._last_ou_sample = None
+        self.args = args
 
-        input_size  = len(self.input_parameters)
-        output_size = len(self.controlled_parameters)
-        hidden_size = (2*input_size+output_size) // 3
-
-        self.model_actor = torch.nn.Sequential(
-            torch.nn.Linear(input_size, hidden_size),
-            torch.nn.LeakyReLU(),
-            #torch.nn.Linear(hidden_size, hidden_size),
-            #torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size, output_size),
-            torch.nn.Tanh()
-        )
-        self.model_target = torch.nn.Sequential(
-            torch.nn.Linear(input_size, hidden_size),
-            torch.nn.LeakyReLU(),
-            #torch.nn.Linear(hidden_size, hidden_size),
-            #torch.nn.LeakyReLU(),
-            torch.nn.Linear(hidden_size, output_size),
-            torch.nn.Tanh()
-        )
-        # change initialization
-        for m_param in self.model_actor.parameters():
-            if len(m_param.shape) == 1:
-                # other initialization for biases
-                torch.nn.init.constant_(m_param, 0.001)
-            else:
-                torch.nn.init.normal_(m_param, 0.0, 1.0)
-        # copy weights from actor -> target
-        for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
-            mtarget_param.data.copy_(mactor_param.data)
-
-        # initialize the optimizer
-        self._init_optimizer()
+        self.input_size  = len(self.input_parameters)
+        self.output_size = len(self.controlled_parameters)
 
         # initialize the OU-Process
         self.ou_process = OrnsteinUhlenbeckProcess(theta = self.ou_theta,
                                                    mu    = self.ou_mu,
                                                    sigma = self.ou_sigma,
-                                                   size  = output_size)
+                                                   size  = self.output_size)
 
         # define the transformation matrix
         trafo_list = []
@@ -295,7 +272,37 @@ class AgentRL:
             row[idx] = 1.0
             trafo_list.append(row)
         self.trafo_matrix = torch.stack(trafo_list).T
+        if self.use_cuda:
+            self.trafo_matrix = self.trafo_matrix.to(0)
 
+        # create or load the models (target and actor)
+        if load_path != "":
+            self._load_models_from_disk(load_path, load_prefix)
+        else:
+            self._init_models_from_scratch()
+
+    def _init_models_from_scratch(self):
+        """
+        Initializes the actor and target model from scratch.
+        """
+        self.model_actor = generate_network(
+                self.agent_network_name,
+                self.input_size,
+                self.output_size,
+                self.args.use_layer_normalization,
+                True)
+        self.model_target = generate_network(
+                self.agent_network_name,
+                self.input_size,
+                self.output_size,
+                self.args.use_layer_normalization,
+                True)
+        # change initialization
+        RLUtilities.init_model(self.model_actor, self.args)
+        # copy weights from actor -> target
+        self.copy_weights_to_target()
+        # initialize the optimizer
+        self._init_optimizer()
         # Move things to GPU, if selected
         self._init_cuda()
 
@@ -316,8 +323,14 @@ class AgentRL:
         if self.use_cuda:
             self.model_actor  = self.model_actor.to(0)
             self.model_target = self.model_target.to(0)
-            self.trafo_matrix = self.trafo_matrix.to(0)
             self._init_optimizer()
+
+    def copy_weights_to_target(self):
+        """
+        copy weights from the actor network to the target network.
+        """
+        for mactor_param, mtarget_param in zip(self.model_actor.parameters(), self.model_target.parameters()):
+            mtarget_param.data.copy_(mactor_param.data)
 
     def optimizer_step(self):
         """
@@ -368,7 +381,7 @@ class AgentRL:
         if add_ou:
             if self._stepts_since_last_ou_update >= self.ou_update_freq:
                 self._stepts_since_last_ou_update = 1
-                ou_sample  = self.ou_process.sample()
+                ou_sample  = self.ou_process.sample() * self.epsilon
                 self._last_ou_sample = ou_sample
             else:
                 self._stepts_since_last_ou_update += 1
@@ -431,9 +444,13 @@ class AgentRL:
         torch.save(self.model_actor,  os.path.join(storage_dir, prefix + "_model_actor.pickle"))
         torch.save(self.model_target, os.path.join(storage_dir, prefix + "_model_target.pickle"))
 
-    def load_models_from_disk(self, storage_dir, prefix=""):
-        self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
-        self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+    def _load_models_from_disk(self, storage_dir, prefix=""):
+        if os.path.exists(os.path.join(storage_dir, prefix + "_model_actor.pickle")):
+            self.model_actor = torch.load(os.path.join(storage_dir, prefix + "_model_actor.pickle"))
+            self.model_target= torch.load(os.path.join(storage_dir, prefix + "_model_target.pickle"))
+        else:
+            self.model_actor = torch.load(os.path.join(storage_dir, prefix[:-1] + "0_model_actor.pickle"))
+            self.model_target= torch.load(os.path.join(storage_dir, prefix[:-1] + "0_model_target.pickle"))
         self._init_optimizer()
         self._init_cuda()
 
