@@ -797,6 +797,16 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
             self._setpoint_unoccu_delta = args.rulebased_setpoint_unoccu_delta
             self._setpoint_occu_mean    = args.rulebased_setpoint_occu_mean
             self._setpoint_occu_delta   = args.rulebased_setpoint_occu_delta
+        self.args = args
+        #
+        # save global state keys for computing step_tensor for DDPG
+        self._PosInGlobalState_ZoneDamper = global_state_keys.index(f"{self.controlled_element} Zone VAV Reheat Damper Position")
+        self._PosInGlobalState_ZoneRelHum = global_state_keys.index(f"{self.controlled_element} Zone Relative Humidity")
+        self._PosInGlobalState_ZoneCO2    = global_state_keys.index(f"{self.controlled_element} Zone CO2")
+        self._PosInGlobalState_MinOfDay   = global_state_keys.index( "Minutes of Day")
+        self._PosInGlobalState_DoW        = global_state_keys.index( "Day of Week")
+        self.controlled_parameters = ["Zone Heating Setpoint"]
+        #self.
 
     def step(self, current_state):
         output_dic = {"Zone VAV Reheat Damper Position":    0.75,
@@ -817,6 +827,26 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
                     output_dic["Zone VAV Reheat Damper Position"] = 0.9
         return output_dic
 
-
+    def step_tensor(self, current_state, use_actor = False, add_ou = False):
+        # this function is required for DDPG only
+        if self.args.model != "Building_5ZoneAirCooled_SingleSetpoint":
+            raise RuntimeError("A mixture of rulebased agents and RL-Agents can only be used with single setpoints at the moment")
+        # lower setpoint: 15.0 degree -> normalized: -1.0
+        # upper setpoint: 20.5 degree -> normalized:  0.1
+        #  7.00 Uhr -> normalized: -0.4162612925642808
+        # 18.00 Uhr -> normalized:  0.5010423905489925
+        # monday -> normalized: -1.0
+        # friday -> normalized < 0.4
+        output_ten = []
+        if not type(current_state) is list:
+            current_state = [current_state]
+        for element in current_state:
+            c_time = element[0, self._PosInGlobalState_MinOfDay]
+            c_day  = element[0, self._PosInGlobalState_DoW]
+            if c_time >= -0.41626129256 and c_time <= 0.501042390548 and c_day < 0.4:
+                output_ten.append([-1.0])
+            else:
+                output_ten.append([ 0.1])
+        return torch.tensor(output_ten)
 
 
