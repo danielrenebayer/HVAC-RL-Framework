@@ -21,6 +21,7 @@ variable_ranges = {
     "Zone Temperature":        ( 10.0,   34.0),
     "Zone Heating/Cooling-Mean Setpoint": ( 14.0,30.0),
     "Zone Heating/Cooling-Delta Setpoint":(  0.1,10.0),
+    "Zone Heating Setpoint":   ( 15.0,   25.0),
     "Rel People Count":        (  0.0,    1.0)
 }
 
