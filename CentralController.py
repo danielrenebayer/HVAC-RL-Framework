@@ -146,6 +146,7 @@ def one_single_episode(algorithm,
                         q_values_list[idx].append(q_values[idx])
                 else:
                     for idx, agent in enumerate(agents):
+                        if agent.type != "RL": continue
                         q_values = agent.step_tensor(norm_state_ten, use_actor=True).detach().numpy()
                         q_values_list[idx].append(q_values)
 
@@ -376,7 +377,7 @@ def one_single_episode(algorithm,
         f = open(os.path.join(hyper_params.checkpoint_dir, f"q_values.pickle"), "wb")
         pickle_dict = {
             "Q value list": q_values_list,
-            "Actions":      [ [agent.output_action_to_action_dict(i) for i in range(len(agent.output_to_action_mapping))] for agent in agents ]
+            "Actions":      [ [agent.output_action_to_action_dict(i) for i in range(len(agent.output_to_action_mapping))] for agent in agents if agent.type == "RL" ]
         }
         pickle.dump(pickle_dict, f)
         f.close()
