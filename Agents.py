@@ -43,6 +43,22 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Temperature"]
         new_agent.controlled_parameters = ["Zone VAV Reheat Damper Position", "Zone Heating/Cooling-Mean Setpoint", "Zone Heating/Cooling-Delta Setpoint"]
 
+    elif zone_class == "SingleSetpoint,Ag+Cr,RL":
+        new_agent = AgentRL(zone_class)
+        new_agent.input_parameters = [
+            "Minutes of Day",
+            "Day of Week",
+            "Calendar Week",
+            "Outdoor Air Temperature",
+            "Outdoor Wind Speed",
+            'Outdoor Solar Radi Direct',
+            "Zone CO2",
+            "Zone Rel People Count",
+            "Zone Next Rel People Count",
+            "Zone Next Next Rel People Count",
+            "Zone Temperature"]
+        new_agent.controlled_parameters = ["Zone Heating Setpoint"]
+
     elif zone_class == "VAV with Reheat,Heating,Cooling,Q,RL":
         new_agent = QNetwork(zone_class)
         new_agent.input_parameters = [
