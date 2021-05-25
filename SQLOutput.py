@@ -80,7 +80,8 @@ class SQLOutput():
             "episode":  ["integer", "episode_number"],
             "step":     ["integer", "timestep"],
             "agent_nr": ["integer", None],
-            "agent_actions": ["string", None]
+            "agent_actions": ["string", None],
+            "controlled_device": ["string", None]
         }
 
 
@@ -193,6 +194,7 @@ class SQLOutput():
                 "episode":       local_vars["episode_number"],
                 "step":          local_vars["timestep"],
                 "agent_nr":      idx,
+                "controlled_device": self.building.agent_device_pairing[agent_name][0],
                 "agent_actions": local_vars["agent_actions_dict"][agent_name]
             }
             self._propagate_to_db("seesea", dict_for_db)
