@@ -46,6 +46,7 @@ def get_argparser():
     parser.add_argument('--agent_init_gain', type=float, default=0.8, help="Gain for Xavier normal initialization")
     parser.add_argument('--agent_init_mean', type=float, default=0.0, help="Mean for normal initialization")
     parser.add_argument('--agent_init_std', type=float, default=0.25, help="Std. deviation for normal initialization")
+    parser.add_argument('--use_layer_normalization', action='store_true', help="Add layer normalization layers bevore every actiavtion function")
     parser.add_argument('--critic_hidden_size', type=int, default=40)
     parser.add_argument('--critic_hidden_activation', type=str, default="tanh", choices=["tanh","LeakyReLU"])
     parser.add_argument('--critic_last_activation',   type=str, default="tanh", choices=["tanh","LeakyReLU"])

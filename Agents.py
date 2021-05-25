@@ -573,8 +573,8 @@ class QNetwork:
         """
         Initializes the actor and target model from scratch.
         """
-        self.model_actor = generate_network(self.agent_network_name, self.input_size, self.output_size)
-        self.model_target = generate_network(self.agent_network_name, self.input_size, self.output_size)
+        self.model_actor = generate_network(self.agent_network_name, self.input_size, self.output_size, self.args.use_layer_normalization)
+        self.model_target = generate_network(self.agent_network_name, self.input_size, self.output_size, self.args.use_layer_normalization)
         # change initialization
         RLUtilities.init_model(self.model_actor, self.args)
         # copy weights from actor -> target
