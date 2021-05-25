@@ -576,12 +576,7 @@ class QNetwork:
         self.model_actor = generate_network(self.agent_network_name, self.input_size, self.output_size)
         self.model_target = generate_network(self.agent_network_name, self.input_size, self.output_size)
         # change initialization
-        for m_param in self.model_actor.parameters():
-            if len(m_param.shape) == 1:
-                # other initialization for biases
-                torch.nn.init.constant_(m_param, -0.00001)
-            else:
-                RLUtilities.init_tensor(m_param, self.args)
+        RLUtilities.init_model(self.model_actor, self.args)
         # copy weights from actor -> target
         self.copy_weights_to_target()
         # initialize the optimizer
