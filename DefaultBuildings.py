@@ -493,10 +493,11 @@ class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
             else:
+                # INFO: Define RL-Agents bevore rulebased agents to ensure correct identification while learning
                 self.agent_device_pairing = {
                     "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Q,RL"),
-                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE3-1": ("SPACE3-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
@@ -522,10 +523,11 @@ class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
             else:
+                # INFO: Define RL-Agents bevore rulebased agents to ensure correct identification while learning
                 self.agent_device_pairing = {
                     "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Ag+Cr,RL"),
-                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE3-1": ("SPACE3-1", "SingleSetpoint,Ag+Cr,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
