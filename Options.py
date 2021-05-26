@@ -61,7 +61,7 @@ def get_argparser():
         "Building_5ZoneAirCooled_SingleSetpoint_SingleBIGAgent",
         "Building_5ZoneAirCooled_SingleSetpoint_SingleAgent",
         "Building_5ZoneAirCooled_SingleAgent", "Building_5ZoneAirCooled_SmallSingleAgent"])
-    parser.add_argument('--single_setpoint_agent_count', type=str, default="all", choices=["all", "one", "two"])
+    parser.add_argument('--single_setpoint_agent_count', type=str, default="all", choices=["all", "one", "two", "one_but3not5"])
     parser.add_argument('--number_occupants', type=int, default=35)
     parser.add_argument('--next_occ_horizont', type=int, default=0, help="Numer of future occupancy states that are added to the state dict.")
     parser.add_argument('--load_models_from_path', type=str, default="", help="Path to the pickle objects for the agent and critic network(s). Do not load something, if set to an empty string (default).")
