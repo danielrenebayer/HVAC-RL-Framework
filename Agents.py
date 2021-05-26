@@ -142,7 +142,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "SPACE5-1 Zone Next Next Rel People Count",
             "SPACE5-1 Zone Temperature"]
         new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (15.0, 25.0, 21)}
+            "Zone Heating Setpoint": (15.0, 25.0, 21 if not args.fewer_q_values else 11)}
 
     elif zone_class == "SingleSetpoint,Q,RL":
         # Requires args.next_occ_horizont >= 2
@@ -162,7 +162,7 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Next Next Rel People Count",
             "Zone Temperature"]
         new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (15.0, 25.0, 21)}
+            "Zone Heating Setpoint": (15.0, 25.0, 21 if not args.fewer_q_values else 11)}
 
     elif zone_class == "5ZoneAirCooled,SingleAgent,RL":
         new_agent = AgentRL(zone_class)

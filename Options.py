@@ -49,6 +49,7 @@ def get_argparser():
     parser.add_argument('--agent_init_mean', type=float, default=0.0, help="Mean for normal initialization")
     parser.add_argument('--agent_init_std', type=float, default=0.25, help="Std. deviation for normal initialization")
     parser.add_argument('--use_layer_normalization', action='store_true', help="Add layer normalization layers bevore every actiavtion function")
+    parser.add_argument('--fewer_q_values', action='store_true', help="Reduce the number of actions an agent can take.")
     parser.add_argument('--agent_w_l2', type=float, default=0.00001, help="L2 penalty for agent parameters")
     parser.add_argument('--critic_w_l2', type=float, default=0.00001, help="L2 penalty for critic parameters")
     parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd", "rmsprop"])
