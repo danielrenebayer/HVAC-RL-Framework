@@ -121,7 +121,10 @@ def one_single_episode(algorithm,
                 agent_actions_list = new_actions
                 # decode the actions for every agent using the individual agent objects
                 for idx, agent in enumerate(agents):
+                  if agent.type == "RL":
                     agent_actions_dict[agent.name] = agent.output_action_to_action_dict(new_actions[idx])
+                  else:
+                    agent_actions_dict[agent.name] = agent.step(state)
             else:
                 for agent in agents:
                   if agent.type == "RL":
@@ -143,6 +146,7 @@ def one_single_episode(algorithm,
                 if agents[0].shared_network_per_agent_class:
                     q_values = agents[0].step_tensor(norm_state_ten, use_actor=True).detach().numpy()
                     for idx, agent in enumerate(agents):
+                        if agent.type != "RL": continue
                         q_values_list[idx].append(q_values[idx])
                 else:
                     for idx, agent in enumerate(agents):
