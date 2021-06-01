@@ -38,6 +38,7 @@ def get_argparser():
     parser.add_argument('--epsilon_initial', type=float, default=1.0, help="The initial value of epsilon.")
     parser.add_argument('--epsilon', type=float, default=0.05, help="The final epsilon value for random sampling in DDQN learning.")
     parser.add_argument('--epsilon_final_step', type=int, default=100, help="The timestep at wich the minimal epsilon value (as defined in epsilon-parameter) should be reached, only for DDQN learning.")
+    parser.add_argument('--epsilon_decay_mode', type=str, default="exponential", choices=["exponential", "linear"])
     parser.add_argument('--episodes_count', type=int, default=100, help="Number of episodes to train on")
     parser.add_argument('--episode_length', type=int, default=30, help="The length of an episode in days")
     parser.add_argument('--episode_start_day', type=int, default=1)

@@ -491,7 +491,11 @@ def run_for_n_episodes(n_episodes, building, building_occ, args, sqloutput = Non
         t_start = timeit.default_timer()
 
         # set epsilon for all agents
-        epsilon = max(args.epsilon, args.epsilon_initial*np.exp(n_episode * (np.log(args.epsilon)-np.log(args.epsilon_initial))/args.epsilon_final_step))
+        if args.epsilon_decay_mode == "exponential":
+            epsilon = max(args.epsilon, args.epsilon_initial*np.exp(n_episode * (np.log(args.epsilon)-np.log(args.epsilon_initial))/args.epsilon_final_step))
+        else:
+            #args.epsilon_decay_mode == "linear":
+            epsilon = max(args.epsilon, ((args.epsilon - args.epsilon_initial)/args.epsilon_final_step)*n_episode+args.epsilon_initial)
         for agent in agents:
             agent.epsilon = epsilon
 
