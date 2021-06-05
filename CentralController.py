@@ -186,6 +186,7 @@ def one_single_episode(algorithm,
         SU.expand_state_next_occup(state, building, hyper_params.next_occ_horizont, ts_diff_in_min, building_occ)
 
         current_energy_Wh = state["energy"] / 360
+        current_energy_kWh= current_energy_Wh / 1000.0
 
         #
         # modify state
@@ -201,7 +202,11 @@ def one_single_episode(algorithm,
         if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
             n_manual_stp_changes_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
             if not hyper_params is None and hyper_params.log_rwd_energy_and_kWh:
-                reward = LAMBDA_REWARD_ENERGY * np.log(current_energy_Wh/1000.0+1) + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
+                reward = LAMBDA_REWARD_ENERGY * np.log(current_energy_kWh+1) + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
+            elif not hyper_params is None and hyper_params.clip_econs_at > 0:
+                if current_energy_kWh > hyper_params.clip_econs_at:
+                    current_energy_kWh = hyper_params.clip_econs_at
+                reward = LAMBDA_REWARD_ENERGY * current_energy_kWh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
             else:
                 reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
         elif hyper_params.reward_function == "rulebased_roomtemp":
