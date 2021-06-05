@@ -798,6 +798,7 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
             self._setpoint_occu_mean    = args.rulebased_setpoint_occu_mean
             self._setpoint_occu_delta   = args.rulebased_setpoint_occu_delta
         self.args = args
+        self.control_vav = args.rulebase_with_VAV
         #
         # save global state keys for computing step_tensor for DDPG
         self._PosInGlobalState_ZoneDamper = global_state_keys.index(f"{self.controlled_element} Zone VAV Reheat Damper Position")
@@ -813,7 +814,8 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
                       "Zone Heating/Cooling-Mean Setpoint":  self._setpoint_unoccu_mean,
                       "Zone Heating/Cooling-Delta Setpoint": self._setpoint_unoccu_delta}
         # set damper position to maximal value if humidity or co2 is high
-        if current_state[f"{self.controlled_element} Zone Relative Humidity"] > 0.8 or \
+        if not self.control_vav or \
+           current_state[f"{self.controlled_element} Zone Relative Humidity"] > 0.8 or \
            current_state[f"{self.controlled_element} Zone CO2"] > 1500: # ppm
                output_dic["Zone VAV Reheat Damper Position"] = 1.0
         #
@@ -823,7 +825,7 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
             if current_state["time"].hour >= 7 and current_state["time"].hour <= 18:
                 output_dic["Zone Heating/Cooling-Mean Setpoint"]  = self._setpoint_occu_mean
                 output_dic["Zone Heating/Cooling-Delta Setpoint"] = self._setpoint_occu_delta
-                if output_dic["Zone VAV Reheat Damper Position"] < 0.9:
+                if self.control_vav and output_dic["Zone VAV Reheat Damper Position"] < 0.9:
                     output_dic["Zone VAV Reheat Damper Position"] = 0.9
         return output_dic
 

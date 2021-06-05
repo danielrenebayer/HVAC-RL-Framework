@@ -73,6 +73,7 @@ def get_argparser():
     parser.add_argument('--eplus_storage_mode', action='store_true', help="Disable the restarting of EnergyPlus simulation at the beginning of a episode, use the old values instead again")
     parser.add_argument('--idf_file', type=str, default="", help="Path to the EPlus IDF file.")
     parser.add_argument('--epw_file', type=str, default="", help="Path to the EPlus weather file.")
+    parser.add_argument('--rulebase_with_VAV', action='store_true', help="Should the rulebased agent control VAV damper position?")
     parser.add_argument('--rulebased_setpoint_unoccu_mean',  type=float, default=22.0)
     parser.add_argument('--rulebased_setpoint_unoccu_delta', type=float, default= 8.0)
     parser.add_argument('--rulebased_setpoint_occu_mean',    type=float, default=22.0)
