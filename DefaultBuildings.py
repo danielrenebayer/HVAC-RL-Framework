@@ -500,7 +500,15 @@ class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
                     "Agent SPACE3-1": ("SPACE3-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
-            else:
+            elif args.single_setpoint_agent_count == "two_but24not35":
+                self.agent_device_pairing = {
+                    "Agent SPACE2-1": ("SPACE2-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE5-1": ("SPACE5-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE3-1": ("SPACE3-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                }
+            elif args.single_setpoint_agent_count == "two":
                 # INFO: Define RL-Agents bevore rulebased agents to ensure correct identification while learning
                 self.agent_device_pairing = {
                     "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Q,RL"),
@@ -509,6 +517,24 @@ class Building_5ZoneAirCooled_SingleSetpoint(Building_5ZoneAirCooled):
                     "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                     "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
                 }
+            elif args.single_setpoint_agent_count == "three":
+                self.agent_device_pairing = {
+                    "Agent SPACE3-1": ("SPACE3-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE5-1": ("SPACE5-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE2-1": ("SPACE2-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE1-1": ("SPACE1-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                }
+            elif args.single_setpoint_agent_count == "three_but124not345":
+                self.agent_device_pairing = {
+                    "Agent SPACE2-1": ("SPACE2-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE4-1": ("SPACE4-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE1-1": ("SPACE1-1", "SingleSetpoint,Q,RL"),
+                    "Agent SPACE3-1": ("SPACE3-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                    "Agent SPACE5-1": ("SPACE5-1", "VAV with Reheat,Heating,Cooling,NoRL"),
+                }
+            else:
+                raise AttributeError(f"{args.single_setpoint_agent_count} is not known")
         elif args.algorithm == "ddpg":
             if args.single_setpoint_agent_count == "all":
                 self.agent_device_pairing = {f"Agent SPACE{i}-1":
