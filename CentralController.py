@@ -200,15 +200,14 @@ def one_single_episode(algorithm,
         #
         # reward computation
         if hyper_params is None or hyper_params.reward_function == "sum_energy_mstpc":
-            n_manual_stp_changes_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
-            if not hyper_params is None and hyper_params.log_rwd_energy_and_kWh:
-                reward = LAMBDA_REWARD_ENERGY * np.log(current_energy_kWh+1) + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
-            elif not hyper_params is None and hyper_params.clip_econs_at > 0:
-                if current_energy_kWh > hyper_params.clip_econs_at:
-                    current_energy_kWh = hyper_params.clip_econs_at
-                reward = LAMBDA_REWARD_ENERGY * current_energy_kWh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
-            else:
-                reward = LAMBDA_REWARD_ENERGY * current_energy_Wh + LAMBDA_REWARD_MANU_STP_CHANGES * n_manual_stp_changes_after_function
+            mstpc_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
+            reward = reward_sum_econs_mstpc(
+                     current_energy_kWh if hyper_params.energy_cons_in_kWh else current_energy_Wh,
+                     mstpc_after_function,
+                     LAMBDA_REWARD_ENERGY,
+                     LAMBDA_REWARD_MANU_STP_CHANGES,
+                     hyper_params.clip_econs_at,
+                     hyper_params.log_rwd_energy)
         elif hyper_params.reward_function == "rulebased_roomtemp":
             reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building, hyper_params.stp_reward_step_offset)
             reward = setpoint_activation_function(reward, hyper_params.stp_reward_function)
@@ -588,6 +587,20 @@ def setpoint_activation_function(n_stp_changes, function_name):
     else:
         raise AttributeError(f"Unknown function name {function_name}.")
 
+
+
+
+def reward_sum_econs_mstpc(current_econs,
+                           mstpc_after_function,
+                           lambda_energy,
+                           lambda_mstpc,
+                           clip_econs_at,
+                           log_rwd_energy):
+    if clip_econs_at > 0 and current_econs > clip_econs_at:
+        current_econs = clip_econs_at
+    if log_rwd_energy:
+        current_econs = np.log(current_econs + 1)
+    reward = lambda_energy * current_econs + lambda_mstpc * mstpc_after_function
 
 
 

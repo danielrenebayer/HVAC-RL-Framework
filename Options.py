@@ -22,13 +22,14 @@ def get_argparser():
         "sum_energy_mstpc", "rulebased_roomtemp",
         "rulebased_agent_output"
         ], help="Select the reward function. Alternate reward: ignore energy and manual setpoint changes, use rulebased reward instead.")
+    parser.add_argument('--energy_cons_in_kWh', action='store_true', help="Change loss computation to use energy consumption in kWh, not Wh.")
     parser.add_argument('--log_reward', action='store_true', help="If set, the logarithm to base e is applied to -reward+1.")
-    parser.add_argument('--log_rwd_energy_and_kWh', action='store_true', help="Do not use the total energy consumption, convert it to kWh and apply logarithm to it.")
+    parser.add_argument('--log_rwd_energy', action='store_true', help="Do not use the total energy consumption, apply logarithm to it.")
     parser.add_argument('--reward_scale', type=float, default=1.0, help="Scaling factor for the final reward. Must not be negative.")
     parser.add_argument('--reward_offset', type=float, default=0.0, help="Offset to add on the final reward. Can be negative too.")
     parser.add_argument('--stp_reward_function', type=str, default="linear", choices=["linear", "quadratic", "cubic", "exponential"], help="Function to apply to number of setpoint changes / rulebased missmatches / agent-output missmatches, but NOT on the energy reward")
     parser.add_argument('--stp_reward_step_offset', type=float, default=0.0, help="Offset for manual setpoint changes.")
-    parser.add_argument('--clip_econs_at', type=float, default=0.0, help="If set to a value > 0, it will clip the reward in kWh there")
+    parser.add_argument('--clip_econs_at', type=float, default=0.0, help="If set to a value > 0, it will clip the energy consumption at this level.")
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--target_network_update_freq', type=int, default=3)
