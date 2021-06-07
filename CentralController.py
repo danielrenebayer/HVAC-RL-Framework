@@ -53,7 +53,10 @@ def one_single_episode(algorithm,
         rpb = ReplayBufferStd(size=RPB_BUFFER_SIZE, number_agents=len(agents))
     #
     # Define the loss for DDQN
-    loss = torch.nn.MSELoss()
+    if hyper_params.ddqn_loss == "L2":
+        loss = torch.nn.MSELoss()
+    else:
+        loss = torch.nn.L1Loss()
     #
     # Lists for command-line outputs
     reward_list = []

@@ -32,6 +32,7 @@ def get_argparser():
     parser.add_argument('--stp_reward_step_offset', type=float, default=0.0, help="Offset for manual setpoint changes.")
     parser.add_argument('--clip_econs_at', type=float, default=0.0, help="If set to a value > 0, it will clip the energy consumption at this level.")
     parser.add_argument('--use_cuda', action='store_true')
+    parser.add_argument('--ddqn_loss', type=str, default="L2", choices=["L1","L2"])
     parser.add_argument('--add_ou_in_eval_epoch', action='store_true', help="Adds the ou process also during evaluation epochs")
     parser.add_argument('--target_network_update_freq', type=int, default=3)
     parser.add_argument('--ou_theta', type=float, default=0.3)
