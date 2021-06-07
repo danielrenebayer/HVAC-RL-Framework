@@ -88,6 +88,7 @@ def one_single_episode(algorithm,
     current_occupancy = building_occ.draw_sample( state["time"] )
     timestep   = 0
     last_state = None
+    historical_econs_values = [0]
     # start the simulation loop
     while not building.model_is_terminate():
         actions = list()
@@ -203,6 +204,16 @@ def one_single_episode(algorithm,
             mstpc_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
             reward = reward_sum_econs_mstpc(
                      current_energy_kWh if hyper_params.energy_cons_in_kWh else current_energy_Wh,
+                     mstpc_after_function,
+                     LAMBDA_REWARD_ENERGY,
+                     LAMBDA_REWARD_MANU_STP_CHANGES,
+                     hyper_params.clip_econs_at,
+                     hyper_params.log_rwd_energy)
+        elif hyper_params.reward_function == "sum_emean_ediff_mstpc":
+            mstpc_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
+            reward = reward_sum_eMean_eDiff_mstpc(
+                     current_energy_kWh if hyper_params.energy_cons_in_kWh else current_energy_Wh,
+                     historical_econs_values,
                      mstpc_after_function,
                      LAMBDA_REWARD_ENERGY,
                      LAMBDA_REWARD_MANU_STP_CHANGES,
@@ -601,7 +612,28 @@ def reward_sum_econs_mstpc(current_econs,
     if log_rwd_energy:
         current_econs = np.log(current_econs + 1)
     reward = lambda_energy * current_econs + lambda_mstpc * mstpc_after_function
+    return reward
 
+
+
+def reward_sum_eMean_eDiff_mstpc(current_econs,
+                                 historical_econs_values,
+                                 mstpc_after_function,
+                                 lambda_energy,
+                                 lambda_mstpc,
+                                 clip_econs_at,
+                                 log_rwd_energy):
+    # compute difference
+    current_diff = current_econs - historical_econs_values[-1]
+    if clip_econs_at > 0 and current_diff > clip_econs_at:
+        current_diff = clip_econs_at
+    reward_energy = (2*current_diff + np.mean(historical_econs_values)) / 3
+    reward = lambda_energy * reward_energy + lambda_mstpc * mstpc_after_function
+    #
+    historical_econs_values.append(current_econs)
+    if len(historical_econs_values) > 9:
+        historical_econs_values.pop(0)
+    return reward
 
 
 

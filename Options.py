@@ -20,6 +20,7 @@ def get_argparser():
     parser.add_argument('--lambda_rwd_energy', type=float, default=0.001)
     parser.add_argument('--reward_function', type=str, default="sum_energy_mstpc", choices=[
         "sum_energy_mstpc", "rulebased_roomtemp",
+        "sum_emean_ediff_mstpc",
         "rulebased_agent_output"
         ], help="Select the reward function. Alternate reward: ignore energy and manual setpoint changes, use rulebased reward instead.")
     parser.add_argument('--energy_cons_in_kWh', action='store_true', help="Change loss computation to use energy consumption in kWh, not Wh.")
