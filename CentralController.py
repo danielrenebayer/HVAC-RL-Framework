@@ -630,6 +630,8 @@ def reward_sum_eMean_eDiff_mstpc(current_econs,
     current_diff = current_econs - historical_econs_values[-1]
     if clip_econs_at > 0 and current_diff > clip_econs_at:
         current_diff = clip_econs_at
+    if current_diff < 0:
+        current_diff = 0
     reward_energy = (2*current_diff + np.mean(historical_econs_values)) / 3
     reward = lambda_energy * reward_energy + lambda_mstpc * mstpc_after_function
     #
