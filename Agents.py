@@ -129,14 +129,15 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
         if args.next_occ_horizont < 2:
             raise AttributeError("Argument next_occ_horizont must be grater then 1, to use this agent!")
         new_agent = QNetwork(zone_class)
+        # the input parameters must match those of "SingleSetpoint,Q,RL" to be able to transfer the models later
         new_agent.input_parameters = [
             "Minutes of Day",
             "Day of Week",
             "Calendar Week",
             "Outdoor Air Temperature",
-            "Outdoor Wind Speed",
+            #"Outdoor Wind Speed",
             'Outdoor Solar Radi Direct',
-            "SPACE5-1 Zone Relative Humidity",
+            #"SPACE5-1 Zone Relative Humidity",
             "SPACE5-1 Zone Rel People Count",
             "SPACE5-1 Zone Next Rel People Count",
             "SPACE5-1 Zone Next Next Rel People Count",
@@ -154,9 +155,9 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Day of Week",
             "Calendar Week",
             "Outdoor Air Temperature",
-            "Outdoor Wind Speed",
+            #"Outdoor Wind Speed",
             'Outdoor Solar Radi Direct',
-            "Zone Relative Humidity",
+            #"Zone Relative Humidity",
             "Zone Rel People Count",
             "Zone Next Rel People Count",
             "Zone Next Next Rel People Count",
