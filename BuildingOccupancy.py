@@ -698,6 +698,8 @@ class BuildingOccupancyAsMatrix:
             meeting7.add_participant(pers)
             meeting8.add_participant(pers)
             meeting9.add_participant(pers)
+        for pers in building_occ.occupants[17:]:
+            pers.comfort_temp = 21
         # transform building_occ to a matrix
         year = 2017
         month = args.episode_start_month
