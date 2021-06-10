@@ -93,16 +93,6 @@ def agent_constructor(zone_class, args, rl_storage_filepath=None):
             "Zone Heating/Cooling-Mean Setpoint": (18.0, 23.0, 6),
             "Zone Heating/Cooling-Delta Setpoint": (2.0, 8.0, 3)}
 
-    elif zone_class == "SingleSetpoint,Q,RL,VerySmall":
-        new_agent = QNetwork(zone_class)
-        new_agent.input_parameters = [
-            "Minutes of Day",
-            "Day of Week",
-            "Zone Rel People Count",
-            "Zone Next Rel People Count"]
-        new_agent.controlled_parameters = {
-            "Zone Heating Setpoint": (14.0, 23.0, 10)}
-
     elif zone_class == "SingleSetpoint,SingleAgent,Q,RL,BIG":
         # Requires args.next_occ_horizont >= 2
         if args.next_occ_horizont < 2:
