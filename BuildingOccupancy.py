@@ -13,7 +13,7 @@ class Person:
         self.gender = gender
         self.default_office = default_office
         self._meetings = []
-        self.presence_start = datetime.time(hour=np.random.randint(8,11), minute=0)
+        self.presence_start = datetime.time(hour=8, minute=0) #hour=np.random.randint(8,11), minute=0)
         self.presence_end   = datetime.time(hour=self.presence_start.hour + 8, minute=0)
         
         if comfort_temp is None:
@@ -306,13 +306,14 @@ class BuildingOccupancy:
         for i in range(number_occupants):
             if len(free_people_in_office_room.keys()) <= 0:
                 break
-            pDefaultOff = np.random.choice(list(free_people_in_office_room.keys()))
+            #pDefaultOff = np.random.choice(list(free_people_in_office_room.keys()))
+            pDefaultOff = list(free_people_in_office_room.keys())[0]
             free_people_in_office_room[pDefaultOff] -= 1
             if free_people_in_office_room[pDefaultOff] <= 0:
                 del free_people_in_office_room[pDefaultOff]
             pName       = f"Person {i}"
             pGender     = "m" if np.random.random() < 0.5 else "w"
-            pComfortTemp= np.random.normal(21.3 if pGender == "w" else 20.3, 0.4)
+            pComfortTemp= 21.3 #np.random.normal(21.3 if pGender == "w" else 20.3, 0.4)
             self.occupants.append(Person( pName, pGender, pDefaultOff, pComfortTemp ))
 
         return number_occupants
