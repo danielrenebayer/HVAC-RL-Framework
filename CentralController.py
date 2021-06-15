@@ -256,7 +256,11 @@ def one_single_episode(algorithm,
                 agents[0].model_actor.zero_grad()
                 b_reward = b_reward.detach().expand(-1, len(agents) ).flatten()[:, np.newaxis]
                 # wrong: b_reward = b_reward.detach().repeat(len(agents), 1)
-                y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+                if hyper_params.ddqn_new:
+                    next_a = agents[0].step_tensor(b_state2, use_actor = True).detach().max(dim=1).indices[:, np.newaxis]
+                    y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).gather(1, next_a)
+                else:
+                    y = b_reward + DISCOUNT_FACTOR * agents[0].step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
                 # compute Q for state1
                 q = agents[0].step_tensor(b_state1, use_actor = True).gather(1, b_action.flatten()[:, np.newaxis])
                 # update agent by minimizing the loss L
@@ -281,7 +285,11 @@ def one_single_episode(algorithm,
                     # compute y (i.e. the TD-target)
                     #  Hint: s_{i+1} <- state2; s_i <- state1
                     agent.model_actor.zero_grad()
-                    y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
+                    if hyper_params.ddqn_new:
+                        next_a = agent.step_tensor(b_state2, use_actor = True).detach().max(dim=1).indices[:, np.newaxis].long()
+                        y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).gather(1, next_a)
+                    else:
+                        y = b_reward.detach() + DISCOUNT_FACTOR * agent.step_tensor(b_state2, use_actor = False).detach().max(dim=1).values[:, np.newaxis]
                     # compute Q for state1
                     q = agent.step_tensor(b_state1, use_actor = True).gather(1, b_action[:, agent_id][:, np.newaxis])
                     # update agent by minimizing the loss L
