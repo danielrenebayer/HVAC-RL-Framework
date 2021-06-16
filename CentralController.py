@@ -211,6 +211,7 @@ def one_single_episode(algorithm,
                      LAMBDA_REWARD_ENERGY,
                      LAMBDA_REWARD_MANU_STP_CHANGES,
                      hyper_params.clip_econs_at,
+                     hyper_params.soften_instead_of_clipping,
                      hyper_params.log_rwd_energy)
         elif hyper_params.reward_function == "sum_emean_ediff_mstpc":
             mstpc_after_function = setpoint_activation_function(n_manual_stp_changes, hyper_params.stp_reward_function)
@@ -221,6 +222,7 @@ def one_single_episode(algorithm,
                      LAMBDA_REWARD_ENERGY,
                      LAMBDA_REWARD_MANU_STP_CHANGES,
                      hyper_params.clip_econs_at,
+                     hyper_params.soften_instead_of_clipping,
                      hyper_params.log_rwd_energy)
         elif hyper_params.reward_function == "rulebased_roomtemp":
             reward, target_temp_per_room = reward_fn_rulebased_roomtemp(state, building, hyper_params.stp_reward_step_offset)
@@ -617,9 +619,13 @@ def reward_sum_econs_mstpc(current_econs,
                            lambda_energy,
                            lambda_mstpc,
                            clip_econs_at,
+                           soften_instead_of_clipping,
                            log_rwd_energy):
     if clip_econs_at > 0 and current_econs > clip_econs_at:
-        current_econs = clip_econs_at
+        if soften_instead_of_clipping:
+            current_econs = clip_econs_at + 0.1 * (current_econs - clip_econs_at)
+        else:
+            current_econs = clip_econs_at
     if log_rwd_energy:
         current_econs = np.log(current_econs + 1)
     reward = lambda_energy * current_econs + lambda_mstpc * mstpc_after_function
@@ -633,11 +639,15 @@ def reward_sum_eMean_eDiff_mstpc(current_econs,
                                  lambda_energy,
                                  lambda_mstpc,
                                  clip_econs_at,
+                                 soften_instead_of_clipping,
                                  log_rwd_energy):
     # compute difference
     current_diff = current_econs - historical_econs_values[-1]
     if clip_econs_at > 0 and current_diff > clip_econs_at:
-        current_diff = clip_econs_at
+        if soften_instead_of_clipping:
+            current_diff = clip_econs_at + 0.1 * (current_diff - clip_econs_at)
+        else:
+            current_diff = clip_econs_at
     if current_diff < 0:
         current_diff = 0
     reward_energy = (2*current_diff + np.mean(historical_econs_values)) / 3
