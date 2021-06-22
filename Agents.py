@@ -686,15 +686,16 @@ class QNetwork:
             # in case of shared networks per agent class:
             # compute outputs first
             action_ids = self.step_tensor(state, use_actor = True).detach().argmax(dim=1)
-            # and then apply random action selection
-            random_vals = np.random.rand(QNetwork._agent_class_shared_n_count[ self.class_name ])
-            for idx, smaller_epsilon in enumerate(random_vals <= self.epsilon):
+            if use_random_action_selection:
+              # and then apply random action selection
+              random_vals = np.random.rand(QNetwork._agent_class_shared_n_count[ self.class_name ])
+              for idx, smaller_epsilon in enumerate(random_vals <= self.epsilon):
                 if smaller_epsilon:
                     action_ids[idx] = np.random.randint(0, self.output_size)
             return action_ids.numpy().tolist()
 
         # else:
-        if np.random.rand() <= self.epsilon:
+        if use_random_action_selection and np.random.rand() <= self.epsilon:
             # return random action
             return np.random.randint(0, self.output_size)
 
