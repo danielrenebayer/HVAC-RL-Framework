@@ -780,9 +780,9 @@ class AgentNoRL_VAVRhHC(AgentNoRL):
         self.name = name
         self.controlled_element = controlled_element
         if args == None:
-            self._setpoint_unoccu_mean  = 23.0
+            self._setpoint_unoccu_mean  = 22.0
             self._setpoint_unoccu_delta =  7.0
-            self._setpoint_occu_mean    = 21.5
+            self._setpoint_occu_mean    = 22.0
             self._setpoint_occu_delta   =  1.0
         else:
             self._setpoint_unoccu_mean  = args.rulebased_setpoint_unoccu_mean

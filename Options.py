@@ -80,7 +80,7 @@ def get_argparser():
     parser.add_argument('--epw_file', type=str, default="", help="Path to the EPlus weather file.")
     parser.add_argument('--rulebase_with_VAV', action='store_true', help="Should the rulebased agent control VAV damper position?")
     parser.add_argument('--rulebased_setpoint_unoccu_mean',  type=float, default=22.0)
-    parser.add_argument('--rulebased_setpoint_unoccu_delta', type=float, default= 8.0)
+    parser.add_argument('--rulebased_setpoint_unoccu_delta', type=float, default= 7.0)
     parser.add_argument('--rulebased_setpoint_occu_mean',    type=float, default=22.0)
     parser.add_argument('--rulebased_setpoint_occu_delta',   type=float, default= 1.0)
     parser.add_argument('--output_Q_vals_iep',  action="store_true", help="Output Q values in evaluation episodes.")
