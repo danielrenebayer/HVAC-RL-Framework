@@ -1,0 +1,6 @@
+checkpoints/
+scripts/result/
+scripts/input.idf
+.*.swp
+*.pyc
+__pycache__/
