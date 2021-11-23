@@ -70,8 +70,8 @@ for i in $(seq $num_iters); do
     arguments+=( "--agent_w_l2" 0.000001 )
     arguments+=( "--use_layer_normalization" )
     arguments+=( "--checkpoint_dir" $checkpoint_dir )
-    arguments+=( "--idf_file" $(realpath 5ZoneAirCooled_HigherWinterSetpoint.idf) )
-    arguments+=( "--epw_file" "../../COBS/cobs/data/weathers/8.epw" )
+    arguments+=( "--idf_file" $(realpath data/5ZoneAirCooled_HigherWinterSetpoint.idf) )
+    arguments+=( "--epw_file" $(realpath data/fairbanks.epw) )
     arguments+=( "--episode_start_month" 1 )
     arguments+=( "--continue_training" )
 

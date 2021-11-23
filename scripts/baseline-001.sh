@@ -25,8 +25,8 @@ python ../code/TrainingController.py \
 	--lambda_rwd_mstpc  0.1 \
 	--stp_reward_step_offset 1.0 \
 	--checkpoint_dir $checkpoint_dir \
-	--idf_file $(realpath 5ZoneAirCooled_HigherWinterSetpoint.idf) \
-	--epw_file ../../COBS/cobs/data/weathers/8.epw \
+	--idf_file $(realpath data/5ZoneAirCooled_HigherWinterSetpoint.idf) \
+	--epw_file $(realpath data/fairbanks.epw) \
 	--episode_start_month 1
 
 
