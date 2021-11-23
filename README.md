@@ -14,4 +14,11 @@ Moreover it requires [COBS](https://github.com/sustainable-computing/COBS)
 
 Further requirements can be found in the requirements.txt file.
 
+## Acknowledgement
+Building models and weather data (`./scripts/data/*`): The Pacific Northwest National Laboratory (PNNL)
+
+## Installation
+It is recommended to place COBS and EnergyPlus above the current folder.
+Anyway, the paths in the file `code/global_paths.py` should be ajusted to your individual settings.
+Detailed example scripts can be found in the `scripts` subfolder.
 
